@@ -82,6 +82,10 @@ manus-agent/
 │           └── worker.ts       # Background job processor
 ├── packages/
 │   └── shared/                 # Shared types and utilities
+├── tests/                      # Test suite (unit + integration)
+│   ├── unit/                   # Unit tests for services
+│   ├── integration/            # Integration tests for API routes
+│   └── fixtures/               # Test fixtures and mock data
 ├── skills/                     # [PRODUCT] Agent skills - TypeScript (31 slash commands)
 ├── .claude/skills/             # [DEV] Claude Code skills - SKILL.md guidance files
 ├── config/                     # Runtime configuration (default.json)
@@ -119,7 +123,10 @@ bun run db:generate  # Generate Prisma client
 
 # Build and test
 bun run build
-bun run test
+bun run test                      # Run all tests from tests/ folder
+bun test tests/unit/              # Run unit tests only
+bun test tests/integration/       # Run integration tests only
+bun test tests/unit/auth.test.ts  # Run specific test file
 bun run lint
 
 # Docker
@@ -261,6 +268,29 @@ interface Skill {
 2. Add Zod validation
 3. Register in main router
 
+### Writing tests
+1. **Create test file in `tests/`:**
+   - Unit tests: `tests/unit/<feature>.test.ts`
+   - Integration tests: `tests/integration/<route>.test.ts`
+2. **Import from source code:**
+   ```typescript
+   import { service } from '../../apps/api/src/services/service';
+   import { route } from '../../apps/api/src/routes/route';
+   ```
+3. **Follow test structure:**
+   ```typescript
+   describe('Feature Name', () => {
+     beforeAll(async () => { /* Setup */ });
+     afterAll(async () => { /* Cleanup */ });
+
+     it('should do something', () => {
+       // Test implementation
+     });
+   });
+   ```
+4. **Run tests:** `bun run test` or `bun test tests/unit/my-test.test.ts`
+5. **See `tests/README.md` for detailed guidelines**
+
 ## Security
 
 - All inputs validated with Zod
@@ -279,3 +309,6 @@ interface Skill {
 - `docker-compose.yml` - Infrastructure definition
 - `SKILL.md` - Claude Code development guidance
 - `.claude/skills/` - Specialized Claude Code skills (api-development, mcp-integration, etc.)
+- `tests/` - **Test suite** (97 tests: unit + integration)
+- `tests/README.md` - Test documentation and guidelines
+- `apps/api/TEST_RESULTS.md` - Test results and bug fixes

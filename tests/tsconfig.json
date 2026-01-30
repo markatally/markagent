@@ -1,0 +1,17 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "paths": {
+      "hono": ["./apps/api/node_modules/hono"],
+      "hono/*": ["./apps/api/node_modules/hono/*"],
+      "@hono/*": ["./apps/api/node_modules/@hono/*"],
+      "zod": ["./apps/api/node_modules/zod"],
+      "@prisma/client": ["./apps/api/node_modules/@prisma/client"],
+      "*": ["./apps/api/node_modules/*"]
+    }
+  },
+  "include": [
+    "./**/*.ts"
+  ]
+}
