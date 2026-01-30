@@ -1,33 +1,47 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-
-// Pages (to be implemented)
-// import { ChatPage } from './pages/Chat';
-// import { LoginPage } from './pages/Login';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { LoginPage } from './pages/LoginPage';
+import { RegisterPage } from './pages/RegisterPage';
+import { ChatPage } from './pages/ChatPage';
+import { NotFoundPage } from './pages/NotFoundPage';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { Toaster } from './components/ui/toaster';
 
 function App() {
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-background text-foreground">
         <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+
+          {/* Protected routes */}
           <Route
-            path="/"
+            path="/chat"
             element={
-              <div className="flex items-center justify-center min-h-screen">
-                <div className="text-center">
-                  <h1 className="text-4xl font-bold mb-4">Manus Agent</h1>
-                  <p className="text-muted-foreground mb-8">
-                    AI-powered autonomous agent for complex tasks
-                  </p>
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    <p>API Status: <span className="text-green-500">Ready</span></p>
-                    <p>Start building the UI components...</p>
-                  </div>
-                </div>
-              </div>
+              <ProtectedRoute>
+                <ChatPage />
+              </ProtectedRoute>
             }
           />
-          {/* Add more routes as pages are implemented */}
+          <Route
+            path="/chat/:sessionId"
+            element={
+              <ProtectedRoute>
+                <ChatPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Default redirect to chat */}
+          <Route path="/" element={<Navigate to="/chat" replace />} />
+
+          {/* 404 page */}
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
+
+        {/* Toast notifications */}
+        <Toaster />
       </div>
     </BrowserRouter>
   );
