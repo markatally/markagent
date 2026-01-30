@@ -6,6 +6,7 @@ import { getLLMClient, LLMMessage } from '../services/llm';
 import { getTokenCounter } from '../services/tokens';
 import { getConfig } from '../services/config';
 import { getToolRegistry, getToolExecutor, type ToolContext } from '../services/tools';
+import { getSkillProcessor } from '../services/skills/processor';
 import path from 'path';
 
 const stream = new Hono<AuthContext>();
@@ -398,12 +399,42 @@ stream.post('/sessions/:sessionId/chat', async (c) => {
     content: m.content,
   }));
 
-  // Add system prompt if not present
-  if (!llmMessages.some((m) => m.role === 'system')) {
-    llmMessages.unshift({
-      role: 'system',
-      content: 'You are a helpful AI assistant. Be concise and helpful.',
-    });
+  // Check for skill invocation (slash command)
+  const skillProcessor = getSkillProcessor();
+  const skillInvocation = skillProcessor.parseCommand(content);
+  let skillTools: string[] | undefined;
+
+  if (skillInvocation) {
+    // Format prompts using skill templates
+    const formatted = skillProcessor.formatPrompts(skillInvocation);
+
+    // Replace system prompt with skill's system prompt
+    const existingSystemIndex = llmMessages.findIndex((m) => m.role === 'system');
+    if (existingSystemIndex >= 0) {
+      llmMessages[existingSystemIndex].content = formatted.systemPrompt;
+    } else {
+      llmMessages.unshift({
+        role: 'system',
+        content: formatted.systemPrompt,
+      });
+    }
+
+    // Update the last user message with the formatted user prompt
+    const lastUserIndex = llmMessages.findLastIndex((m) => m.role === 'user');
+    if (lastUserIndex >= 0) {
+      llmMessages[lastUserIndex].content = formatted.userPrompt;
+    }
+
+    // Restrict tools to skill's required tools
+    skillTools = formatted.requiredTools;
+  } else {
+    // Add default system prompt if not present
+    if (!llmMessages.some((m) => m.role === 'system')) {
+      llmMessages.unshift({
+        role: 'system',
+        content: 'You are a helpful AI assistant. Be concise and helpful.',
+      });
+    }
   }
 
   // Truncate to fit context window
@@ -422,8 +453,10 @@ stream.post('/sessions/:sessionId/chat', async (c) => {
   };
 
   // Get tool registry and convert to OpenAI format
+  // If skill invocation, use skill's required tools; otherwise use configured tools
   const toolRegistry = getToolRegistry(toolContext);
-  const tools = config.tools.enabled.length > 0 ? toolRegistry.toOpenAIFunctions(config.tools.enabled) : undefined;
+  const enabledTools = skillTools || config.tools.enabled;
+  const tools = enabledTools.length > 0 ? toolRegistry.toOpenAIFunctions(enabledTools) : undefined;
 
   return streamSSE(c, async (sseStream) => {
     const llmClient = getLLMClient();

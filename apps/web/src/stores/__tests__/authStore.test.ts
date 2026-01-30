@@ -17,6 +17,13 @@ vi.mock('../../lib/api', () => ({
   getAccessToken: vi.fn(),
 }));
 
+// Helper to create mock user matching User type
+const createMockUser = (id: string, email: string) => ({
+  id,
+  email,
+  createdAt: new Date('2024-01-01'),
+});
+
 describe('authStore', () => {
   beforeEach(() => {
     // Reset store state before each test
@@ -32,7 +39,7 @@ describe('authStore', () => {
 
   describe('login', () => {
     it('should successfully login and update state', async () => {
-      const mockUser = { id: '1', email: 'test@example.com', name: 'Test User' };
+      const mockUser = createMockUser('1', 'test@example.com');
       const mockResponse = {
         user: mockUser,
         accessToken: 'access-token',
@@ -73,7 +80,7 @@ describe('authStore', () => {
 
     it('should set loading state during login', async () => {
       const mockResponse = {
-        user: { id: '1', email: 'test@example.com', name: 'Test' },
+        user: createMockUser('1', 'test@example.com'),
         accessToken: 'token',
         refreshToken: 'refresh',
       };
@@ -100,7 +107,7 @@ describe('authStore', () => {
 
   describe('register', () => {
     it('should successfully register and update state', async () => {
-      const mockUser = { id: '1', email: 'new@example.com', name: 'New User' };
+      const mockUser = createMockUser('1', 'new@example.com');
       const mockResponse = {
         user: mockUser,
         accessToken: 'access-token',
@@ -140,7 +147,7 @@ describe('authStore', () => {
     it('should clear authentication state', () => {
       // Set up authenticated state
       useAuthStore.setState({
-        user: { id: '1', email: 'test@example.com', name: 'Test' },
+        user: createMockUser('1', 'test@example.com'),
         accessToken: 'token',
         isAuthenticated: true,
       });
@@ -184,7 +191,7 @@ describe('authStore', () => {
       vi.mocked(apiClient.apiClient.auth.refresh).mockRejectedValue(error);
 
       useAuthStore.setState({
-        user: { id: '1', email: 'test@example.com', name: 'Test' },
+        user: createMockUser('1', 'test@example.com'),
         isAuthenticated: true,
       });
 
@@ -223,7 +230,7 @@ describe('authStore', () => {
 
   describe('setUser', () => {
     it('should set user and authentication state', () => {
-      const mockUser = { id: '1', email: 'test@example.com', name: 'Test' };
+      const mockUser = createMockUser('1', 'test@example.com');
 
       const { setUser } = useAuthStore.getState();
       setUser(mockUser);
@@ -235,7 +242,7 @@ describe('authStore', () => {
 
     it('should clear authentication when user is null', () => {
       useAuthStore.setState({
-        user: { id: '1', email: 'test@example.com', name: 'Test' },
+        user: createMockUser('1', 'test@example.com'),
         isAuthenticated: true,
       });
 

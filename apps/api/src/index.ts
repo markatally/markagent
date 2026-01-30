@@ -9,6 +9,8 @@ import { authRoutes } from './routes/auth';
 import { sessionRoutes } from './routes/sessions';
 import { messageRoutes } from './routes/messages';
 import { streamRoutes } from './routes/stream';
+import { fileRoutes } from './routes/files';
+import { skillRoutes } from './routes/skills';
 
 const app = new Hono();
 
@@ -37,6 +39,8 @@ app.route('/api/auth', authRoutes);
 app.route('/api/sessions', sessionRoutes);
 app.route('/api', messageRoutes); // Messages are nested under sessions
 app.route('/api', streamRoutes); // SSE streaming endpoints
+app.route('/api', fileRoutes); // File upload/download endpoints
+app.route('/api/skills', skillRoutes); // Skill listing and invocation
 
 // 404 handler
 app.notFound((c) => {

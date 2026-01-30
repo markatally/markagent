@@ -243,6 +243,14 @@ export const messagesApi = {
   },
 };
 
+// SSE Event from backend
+export interface SSEEvent {
+  type: string;
+  sessionId: string;
+  timestamp: number;
+  data: any;
+}
+
 // Chat API (streaming)
 export const chatApi = {
   /**
@@ -255,14 +263,205 @@ export const chatApi = {
   },
 
   /**
-   * Send a message to start a chat stream
-   * Returns immediately, actual response comes via SSE
+   * Send a message and stream the response
+   * Returns an async generator that yields SSE events
    */
-  async send(sessionId: string, content: string): Promise<void> {
-    await apiFetch<void>(`/sessions/${sessionId}/chat`, {
+  async *sendAndStream(
+    sessionId: string,
+    content: string
+  ): AsyncGenerator<SSEEvent, void, unknown> {
+    const token = getAccessToken();
+    const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/chat`, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ content }),
     });
+
+    if (!response.ok) {
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error?.message || errorData.message || errorMessage;
+      } catch {
+        // Response is not JSON
+      }
+      throw new ApiError(errorMessage, response.status);
+    }
+
+    if (!response.body) {
+      throw new ApiError('No response body', 500);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Parse SSE events from buffer
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const jsonStr = line.slice(6); // Remove 'data: ' prefix
+            if (jsonStr.trim()) {
+              try {
+                const event: SSEEvent = JSON.parse(jsonStr);
+                yield event;
+              } catch (e) {
+                console.error('Failed to parse SSE event:', e, jsonStr);
+              }
+            }
+          }
+        }
+      }
+
+      // Process any remaining data in buffer
+      if (buffer.startsWith('data: ')) {
+        const jsonStr = buffer.slice(6);
+        if (jsonStr.trim()) {
+          try {
+            const event: SSEEvent = JSON.parse(jsonStr);
+            yield event;
+          } catch (e) {
+            console.error('Failed to parse final SSE event:', e, jsonStr);
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  },
+};
+
+// Files API
+export interface FileInfo {
+  id: string;
+  filename: string;
+  filepath: string;
+  sizeBytes: number;
+  mimeType: string;
+  createdAt: string;
+}
+
+export const filesApi = {
+  /**
+   * Upload a file to a session
+   */
+  async upload(sessionId: string, file: File): Promise<FileInfo> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const token = getAccessToken();
+    const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/files`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new ApiError(
+        error.error?.message || 'Upload failed',
+        response.status,
+        error.error?.code
+      );
+    }
+
+    return response.json();
+  },
+
+  /**
+   * List files in a session
+   */
+  async list(sessionId: string): Promise<{ files: FileInfo[] }> {
+    return apiFetch<{ files: FileInfo[] }>(`/sessions/${sessionId}/files`);
+  },
+
+  /**
+   * Download a file
+   */
+  async download(sessionId: string, fileId: string): Promise<Blob> {
+    const token = getAccessToken();
+    const response = await fetch(
+      `${API_BASE_URL}/sessions/${sessionId}/files/${fileId}/download`,
+      {
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new ApiError('Download failed', response.status);
+    }
+
+    return response.blob();
+  },
+
+  /**
+   * Delete a file
+   */
+  async delete(sessionId: string, fileId: string): Promise<void> {
+    return apiFetch<void>(`/sessions/${sessionId}/files/${fileId}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// Skills API
+export interface Skill {
+  name: string;
+  description: string;
+  aliases: string[];
+  category: string;
+  requiredTools: string[];
+  parameters: Array<{
+    name: string;
+    description: string;
+    required: boolean;
+    type: string;
+  }>;
+}
+
+export interface SkillsResponse {
+  skills: Skill[];
+  categories: Array<{ name: string; skills: string[] }>;
+  total: number;
+}
+
+export const skillsApi = {
+  /**
+   * List all available skills
+   */
+  async list(): Promise<SkillsResponse> {
+    return apiFetch<SkillsResponse>('/skills');
+  },
+
+  /**
+   * Get details for a specific skill
+   */
+  async get(name: string): Promise<Skill & {
+    systemPrompt: string;
+    userPromptTemplate: string;
+    help: string;
+  }> {
+    return apiFetch<Skill & {
+      systemPrompt: string;
+      userPromptTemplate: string;
+      help: string;
+    }>(`/skills/${name}`);
   },
 };
 
@@ -272,4 +471,6 @@ export const apiClient = {
   sessions: sessionsApi,
   messages: messagesApi,
   chat: chatApi,
+  files: filesApi,
+  skills: skillsApi,
 };

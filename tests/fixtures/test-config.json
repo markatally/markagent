@@ -26,7 +26,7 @@
     }
   },
   "sandbox": {
-    "enabled": true,
+    "enabled": false,
     "image": "manus-sandbox:latest",
     "memory": "512MB",
     "cpu": "1",
@@ -36,25 +36,7 @@
   },
   "mcp": {
     "enabled": false,
-    "servers": [
-      {
-        "name": "filesystem",
-        "transport": "stdio",
-        "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
-        "enabled": false
-      },
-      {
-        "name": "github",
-        "transport": "stdio",
-        "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-github"],
-        "env": {
-          "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
-        },
-        "enabled": false
-      }
-    ],
+    "servers": [],
     "connectionTimeout": 10000,
     "requestTimeout": 30000
   },

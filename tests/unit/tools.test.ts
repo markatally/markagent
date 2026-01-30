@@ -1,13 +1,20 @@
-import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
-import { getToolRegistry, getToolExecutor, type ToolContext } from '../../apps/api/src/services/tools';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'bun:test';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 
-// Set CONFIG_PATH for tests if not already set
-if (!process.env.CONFIG_PATH) {
-  process.env.CONFIG_PATH = path.join(process.cwd(), 'config/default.json');
-}
+// Set CONFIG_PATH for tests - use test config with sandbox disabled
+// This ensures bash_executor tests use direct execution, not Docker
+process.env.CONFIG_PATH = path.join(process.cwd(), 'tests/fixtures/test-config.json');
+
+// Clear config cache to ensure test config is loaded
+import { clearConfigCache } from '../../apps/api/src/services/config';
+import { clearSandboxManager } from '../../apps/api/src/services/sandbox';
+clearConfigCache();
+clearSandboxManager();
+
+// Import after setting CONFIG_PATH and clearing cache
+import { getToolRegistry, getToolExecutor, clearToolRegistry, type ToolContext } from '../../apps/api/src/services/tools';
 
 describe('Phase 4: Tool System', () => {
   let testWorkspace: string;

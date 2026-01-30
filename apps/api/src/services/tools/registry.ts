@@ -3,6 +3,7 @@ import type { ChatCompletionTool } from 'openai/resources/chat/completions';
 import { FileReaderTool } from './file_reader';
 import { FileWriterTool } from './file_writer';
 import { BashExecutorTool } from './bash_executor';
+import { bridgeAllMCPToolsSync } from '../mcp/bridge';
 
 /**
  * Tool Registry
@@ -10,6 +11,7 @@ import { BashExecutorTool } from './bash_executor';
  */
 export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
+  private mcpToolsLoaded = false;
 
   constructor(private context: ToolContext) {
     this.registerBuiltInTools();
@@ -25,10 +27,35 @@ export class ToolRegistry {
   }
 
   /**
+   * Register MCP tools (if available)
+   * Should be called after MCP manager is initialized
+   */
+  registerMCPTools(): void {
+    if (this.mcpToolsLoaded) return;
+
+    try {
+      const mcpTools = bridgeAllMCPToolsSync();
+      for (const tool of mcpTools) {
+        this.register(tool);
+      }
+      this.mcpToolsLoaded = true;
+    } catch (error) {
+      console.error('Failed to register MCP tools:', error);
+    }
+  }
+
+  /**
    * Register a tool
    */
   register(tool: Tool): void {
     this.tools.set(tool.name, tool);
+  }
+
+  /**
+   * Unregister a tool
+   */
+  unregister(toolName: string): void {
+    this.tools.delete(toolName);
   }
 
   /**
@@ -43,6 +70,13 @@ export class ToolRegistry {
    */
   getAllTools(): Tool[] {
     return Array.from(this.tools.values());
+  }
+
+  /**
+   * Get tool names
+   */
+  getToolNames(): string[] {
+    return Array.from(this.tools.keys());
   }
 
   /**
@@ -78,6 +112,15 @@ export class ToolRegistry {
     const tool = this.getTool(toolName);
     return tool?.timeout ?? 30000;
   }
+
+  /**
+   * Check if a tool is an MCP tool
+   */
+  isMCPTool(toolName: string): boolean {
+    // Use the isMCPTool function from bridge
+    const { isMCPTool } = require('../mcp/bridge');
+    return isMCPTool(toolName);
+  }
 }
 
 // Singleton instance per context
@@ -90,7 +133,10 @@ export function getToolRegistry(context: ToolContext): ToolRegistry {
   const cacheKey = context.sessionId;
 
   if (!registryCache.has(cacheKey)) {
-    registryCache.set(cacheKey, new ToolRegistry(context));
+    const registry = new ToolRegistry(context);
+    // Try to load MCP tools
+    registry.registerMCPTools();
+    registryCache.set(cacheKey, registry);
   }
 
   return registryCache.get(cacheKey)!;
@@ -101,4 +147,14 @@ export function getToolRegistry(context: ToolContext): ToolRegistry {
  */
 export function clearToolRegistry(sessionId: string): void {
   registryCache.delete(sessionId);
+}
+
+/**
+ * Refresh MCP tools in all registries
+ * Call this after MCP manager is initialized
+ */
+export function refreshMCPToolsInAllRegistries(): void {
+  for (const registry of registryCache.values()) {
+    registry.registerMCPTools();
+  }
 }

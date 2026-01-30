@@ -1,5 +1,13 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get directory of this file for reliable path resolution
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Config path relative to this file: services/ -> src/ -> api/ -> apps/ -> project root
+const DEFAULT_CONFIG_PATH = path.resolve(__dirname, '../../../../config/default.json');
 
 export interface LLMConfig {
   provider: string;
@@ -83,7 +91,7 @@ export function loadConfig(): AppConfig {
     return cachedConfig;
   }
 
-  const configPath = process.env.CONFIG_PATH || path.join(process.cwd(), '../../config/default.json');
+  const configPath = process.env.CONFIG_PATH || DEFAULT_CONFIG_PATH;
 
   let config: AppConfig;
 

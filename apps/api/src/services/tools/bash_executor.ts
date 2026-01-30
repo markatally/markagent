@@ -3,12 +3,14 @@ import { promisify } from 'util';
 import path from 'path';
 import type { Tool, ToolResult, ToolContext } from './types';
 import { getConfig } from '../config';
+import { getSandboxManager } from '../sandbox';
 
 const execAsync = promisify(exec);
 
 /**
  * Bash Executor Tool
  * Executes bash/shell commands in the workspace
+ * Uses Docker sandbox when enabled for isolation
  */
 export class BashExecutorTool implements Tool {
   name = 'bash_executor';
@@ -79,7 +81,94 @@ export class BashExecutorTool implements Tool {
         }
       }
 
-      // Execute command with timeout
+      // Check if sandbox is enabled
+      const sandboxManager = getSandboxManager();
+      if (sandboxManager.isEnabled()) {
+        return await this.executeInSandbox(command, cwd, startTime);
+      }
+
+      // Fallback to direct execution
+      return await this.executeDirect(command, cwd, startTime);
+    } catch (error: any) {
+      return {
+        success: false,
+        output: '',
+        error: error.message || 'Command execution failed',
+        duration: Date.now() - startTime,
+      };
+    }
+  }
+
+  /**
+   * Execute command in Docker sandbox
+   */
+  private async executeInSandbox(
+    command: string,
+    cwd: string,
+    startTime: number
+  ): Promise<ToolResult> {
+    const sandboxManager = getSandboxManager();
+
+    try {
+      // Ensure sandbox exists for this session
+      await sandboxManager.createSandbox({
+        sessionId: this.context.sessionId,
+        workspaceDir: this.context.workspaceDir,
+      });
+
+      // Convert host path to container path
+      // Host: /tmp/manus-workspaces/{sessionId}/subdir
+      // Container: /workspace/subdir
+      let containerWorkDir = '/workspace';
+      if (cwd !== this.context.workspaceDir) {
+        const relativePath = path.relative(this.context.workspaceDir, cwd);
+        containerWorkDir = path.join('/workspace', relativePath);
+      }
+
+      // Execute command in sandbox
+      const result = await sandboxManager.executeCommand(this.context.sessionId, {
+        command,
+        workingDir: containerWorkDir,
+        timeout: this.timeout / 1000, // Convert to seconds
+      });
+
+      if (result.timedOut) {
+        return {
+          success: false,
+          output: result.output,
+          error: 'Command timed out',
+          duration: Date.now() - startTime,
+        };
+      }
+
+      return {
+        success: result.success,
+        output: result.output || '(no output)',
+        error: result.error,
+        duration: Date.now() - startTime,
+      };
+    } catch (error: any) {
+      // If sandbox fails, log error but don't fallback to direct execution
+      // This maintains security isolation
+      console.error('Sandbox execution failed:', error);
+      return {
+        success: false,
+        output: '',
+        error: `Sandbox execution failed: ${error.message}`,
+        duration: Date.now() - startTime,
+      };
+    }
+  }
+
+  /**
+   * Execute command directly on host (when sandbox is disabled)
+   */
+  private async executeDirect(
+    command: string,
+    cwd: string,
+    startTime: number
+  ): Promise<ToolResult> {
+    try {
       const { stdout, stderr } = await execAsync(command, {
         cwd,
         timeout: this.timeout,
