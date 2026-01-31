@@ -1,4 +1,5 @@
 import type { User, Session, Message } from '@manus/shared';
+import { useAuthStore } from '../stores/authStore';
 
 // API base URL (proxied through Vite dev server)
 const API_BASE_URL = '/api';
@@ -19,18 +20,28 @@ export class ApiError extends Error {
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
 
-export function setTokens(access: string, refresh: string) {
-  accessToken = access;
+// When tokens are cleared, also update the Zustand store
+function syncTokenStateToStore(token: string | null, refresh: string | null) {
+  accessToken = token;
   refreshToken = refresh;
-  localStorage.setItem('accessToken', access);
-  localStorage.setItem('refreshToken', refresh);
+  if (token) {
+    localStorage.setItem('accessToken', token);
+    localStorage.setItem('refreshToken', refresh || '');
+    useAuthStore.getState().setIsAuthenticated(true);
+  } else {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    useAuthStore.getState().setIsAuthenticated(false);
+    useAuthStore.getState().setUser(null);
+  }
+}
+
+export function setTokens(access: string, refresh: string) {
+  syncTokenStateToStore(access, refresh);
 }
 
 export function clearTokens() {
-  accessToken = null;
-  refreshToken = null;
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
+  syncTokenStateToStore(null, null);
 }
 
 export function getAccessToken(): string | null {

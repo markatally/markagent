@@ -237,38 +237,33 @@ files.get('/sessions/:sessionId/files/:fileId/download', async (c) => {
     // Read file
     const fileBuffer = await getFile(workspaceDir, dbFile.filepath);
 
-    // Set headers for download
+    // Set headers for download - important for browser to handle as file download
     c.header('Content-Type', dbFile.mimeType || 'application/octet-stream');
     c.header(
       'Content-Disposition',
       `attachment; filename="${encodeURIComponent(dbFile.filename)}"`
     );
     c.header('Content-Length', fileBuffer.length.toString());
+    c.header('Cache-Control', 'no-cache');
 
     return c.body(fileBuffer);
   } catch (error: any) {
     console.error('File download failed:', error);
 
-    if (error.message === 'File not found') {
-      return c.json(
-        {
-          error: {
-            code: 'FILE_NOT_FOUND',
-            message: 'File not found on disk',
-          },
-        },
-        404
-      );
-    }
+    const statusCode = error.message === 'File not found' ? 404 : 500;
+    const errorCode = error.message === 'File not found' ? 'FILE_NOT_FOUND' : 'DOWNLOAD_FAILED';
+    const errorMessage = error.message === 'File not found'
+      ? 'File not found on disk. The file may have been moved or deleted.'
+      : (error.message || 'Failed to download file');
 
     return c.json(
       {
         error: {
-          code: 'DOWNLOAD_FAILED',
-          message: error.message || 'Failed to download file',
+          code: errorCode,
+          message: errorMessage,
         },
       },
-      500
+      statusCode
     );
   }
 });

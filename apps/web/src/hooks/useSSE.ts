@@ -20,7 +20,9 @@ export function useSSE({ sessionId, enabled, onComplete, onError }: UseSSEOption
   const startStreaming = useChatStore((state) => state.startStreaming);
   const appendStreamingContent = useChatStore((state) => state.appendStreamingContent);
   const startToolCall = useChatStore((state) => state.startToolCall);
+  const updateToolCallProgress = useChatStore((state) => state.updateToolCallProgress);
   const completeToolCall = useChatStore((state) => state.completeToolCall);
+  const addFileArtifact = useChatStore((state) => state.addFileArtifact);
   const stopStreaming = useChatStore((state) => state.stopStreaming);
   const finalizeStreamingMessage = useChatStore((state) => state.finalizeStreamingMessage);
 
@@ -62,7 +64,18 @@ export function useSSE({ sessionId, enabled, onComplete, onError }: UseSSEOption
               startToolCall(
                 event.data.toolCallId,
                 event.data.toolName,
-                event.data.parameters
+                event.data.params || event.data.parameters
+              );
+            }
+            break;
+
+          case 'tool.progress':
+            if (event.data) {
+              updateToolCallProgress(
+                event.data.toolCallId,
+                event.data.current || 0,
+                event.data.total || 100,
+                event.data.message
               );
             }
             break;
@@ -88,6 +101,21 @@ export function useSSE({ sessionId, enabled, onComplete, onError }: UseSSEOption
                 duration: event.data.duration || 0,
               };
               completeToolCall(event.data.toolCallId, toolResult);
+            }
+            break;
+
+          case 'file.created':
+            // File artifact created - add to store for independent display
+            if (event.data?.fileId && event.data?.filename) {
+              const artifact: import('@manus/shared').Artifact = {
+                fileId: event.data.fileId,
+                name: event.data.filename,
+                type: event.data.type || 'file',
+                mimeType: event.data.mimeType,
+                size: event.data.size,
+                content: '',
+              };
+              addFileArtifact(sessionId, artifact);
             }
             break;
 
@@ -124,7 +152,9 @@ export function useSSE({ sessionId, enabled, onComplete, onError }: UseSSEOption
     startStreaming,
     appendStreamingContent,
     startToolCall,
+    updateToolCallProgress,
     completeToolCall,
+    addFileArtifact,
     stopStreaming,
     finalizeStreamingMessage,
     queryClient,

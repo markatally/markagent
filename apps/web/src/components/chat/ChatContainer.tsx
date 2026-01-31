@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
 import { ToolCallDisplay } from './ToolCallDisplay';
+import { ArtifactDisplay } from './ArtifactDisplay';
 import { apiClient, type SSEEvent } from '../../lib/api';
 import { useChatStore } from '../../stores/chatStore';
 import { useToast } from '../../hooks/use-toast';
@@ -13,6 +14,7 @@ interface ChatContainerProps {
 
 export function ChatContainer({ sessionId }: ChatContainerProps) {
   const [isSending, setIsSending] = useState(false);
+  const [files, setFiles] = useState<import('@manus/shared').Artifact[]>([]);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -74,6 +76,21 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
         }
         break;
 
+      case 'file.created':
+        // File artifact created - add to local state for display
+        if (event.data?.fileId && event.data?.filename) {
+          const artifact: import('@manus/shared').Artifact = {
+            fileId: event.data.fileId,
+            name: event.data.filename,
+            type: event.data.type || 'file',
+            mimeType: event.data.mimeType,
+            size: event.data.size,
+            content: '',
+          };
+          setFiles((prev) => [...prev, artifact]);
+        }
+        break;
+
       case 'error':
         console.error('Stream error:', event.data);
         stopStreaming();
@@ -125,6 +142,18 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
       <MessageList sessionId={sessionId} />
       <ToolCallDisplay sessionId={sessionId} />
       <ChatInput onSend={handleSendMessage} disabled={isSending} />
+
+      {/* Display generated files independently */}
+      {files.length > 0 && (
+        <div className="p-4 border-t bg-muted/20">
+          <div className="text-xs font-medium text-muted-foreground mb-2">
+            Generated Files ({files.length})
+          </div>
+          {files.map((file, idx) => (
+            <ArtifactDisplay key={idx} artifact={file} sessionId={sessionId} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

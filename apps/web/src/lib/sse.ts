@@ -1,7 +1,11 @@
 // SSE Event types from backend
 export interface StreamEvent {
   type: 'message.start' | 'message.delta' | 'message.complete' |
-        'tool.start' | 'tool.complete' | 'tool.error' | 'error';
+        'thinking.start' | 'thinking.delta' | 'thinking.complete' |
+        'tool.start' | 'tool.progress' | 'tool.complete' | 'tool.error' |
+        'plan.created' | 'plan.step.start' | 'plan.step.complete' |
+        'approval.required' | 'file.created' | 'file.modified' | 'file.deleted' |
+        'error' | 'session.end';
   data: any;
 }
 

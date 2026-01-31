@@ -17,6 +17,7 @@ interface AuthState {
   logout: () => void;
   refreshToken: () => Promise<void>;
   setUser: (user: User | null) => void;
+  setIsAuthenticated: (isAuth: boolean) => void;
   clearError: () => void;
   initialize: () => void;
 }
@@ -121,6 +122,13 @@ export const useAuthStore = create<AuthState>()(
         set({
           user,
           isAuthenticated: !!user,
+        });
+      },
+
+      // Set authentication state action
+      setIsAuthenticated: (isAuth: boolean) => {
+        set({
+          isAuthenticated: isAuth,
         });
       },
 

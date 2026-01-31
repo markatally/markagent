@@ -9,6 +9,23 @@ export interface ToolResult {
   error?: string;
   duration: number;
   artifacts?: Artifact[];
+  progress?: {
+    current: number;
+    total: number;
+    message?: string;
+  };
+}
+
+/**
+ * Progress callback for long-running operations
+ */
+export type ProgressCallback = (current: number, total: number, message?: string) => void;
+
+/**
+ * Tool execution options
+ */
+export interface ToolExecutionOptions {
+  onProgress?: ProgressCallback;
 }
 
 /**
@@ -30,7 +47,7 @@ export interface Tool {
   name: string;
   description: string;
   inputSchema: JSONSchema;
-  execute(params: Record<string, any>): Promise<ToolResult>;
+  execute(params: Record<string, any>, onProgress?: ProgressCallback): Promise<ToolResult>;
   requiresConfirmation: boolean;
   timeout: number;
 }

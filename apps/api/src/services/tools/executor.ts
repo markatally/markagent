@@ -12,7 +12,11 @@ export class ToolExecutor {
   /**
    * Execute a tool by name with given parameters
    */
-  async execute(toolName: string, params: Record<string, any>): Promise<ToolResult> {
+  async execute(
+    toolName: string,
+    params: Record<string, any>,
+    options?: ToolExecutionOptions
+  ): Promise<ToolResult> {
     const registry = getToolRegistry(this.context);
     const tool = registry.getTool(toolName);
 
@@ -28,8 +32,13 @@ export class ToolExecutor {
     const startTime = Date.now();
 
     try {
-      // Execute tool with timeout
-      const result = await this.executeWithTimeout(tool, params, tool.timeout);
+      // Execute tool with timeout and optional progress callback
+      const result = await this.executeWithTimeout(
+        tool,
+        params,
+        tool.timeout,
+        options?.onProgress
+      );
       return result;
     } catch (error) {
       return {
@@ -45,9 +54,9 @@ export class ToolExecutor {
    * Execute multiple tools in parallel
    */
   async executeParallel(
-    tools: Array<{ name: string; params: Record<string, any> }>
+    tools: Array<{ name: string; params: Record<string, any>; options?: ToolExecutionOptions }>
   ): Promise<ToolResult[]> {
-    const promises = tools.map(({ name, params }) => this.execute(name, params));
+    const promises = tools.map(({ name, params, options }) => this.execute(name, params, options));
     return Promise.all(promises);
   }
 
@@ -55,12 +64,12 @@ export class ToolExecutor {
    * Execute multiple tools sequentially
    */
   async executeSequential(
-    tools: Array<{ name: string; params: Record<string, any> }>
+    tools: Array<{ name: string; params: Record<string, any>; options?: ToolExecutionOptions }>
   ): Promise<ToolResult[]> {
     const results: ToolResult[] = [];
 
-    for (const { name, params } of tools) {
-      const result = await this.execute(name, params);
+    for (const { name, params, options } of tools) {
+      const result = await this.execute(name, params, options);
       results.push(result);
 
       // Stop on first failure if configured
@@ -78,7 +87,8 @@ export class ToolExecutor {
   private async executeWithTimeout(
     tool: Tool,
     params: Record<string, any>,
-    timeoutMs: number
+    timeoutMs: number,
+    onProgress?: ProgressCallback
   ): Promise<ToolResult> {
     return new Promise<ToolResult>((resolve, reject) => {
       const timeoutId = setTimeout(() => {
@@ -86,7 +96,7 @@ export class ToolExecutor {
       }, timeoutMs);
 
       tool
-        .execute(params)
+        .execute(params, onProgress)
         .then((result) => {
           clearTimeout(timeoutId);
           resolve(result);

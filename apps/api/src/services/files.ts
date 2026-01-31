@@ -179,12 +179,30 @@ export async function saveFile(
 }
 
 /**
- * Get file from session workspace
+ * Get file from session workspace or project outputs directory
+ * Handles both workspace files and project-level generated files (outputs/)
  */
 export async function getFile(
   workspaceDir: string,
   filepath: string
 ): Promise<Buffer> {
+  // Check if file is in project outputs directory
+  if (filepath.startsWith('outputs/')) {
+    // For project-level outputs, use project root instead of workspace
+    const projectRoot = process.cwd();
+    const fullPath = path.join(projectRoot, filepath);
+
+    // Verify file exists
+    try {
+      await fs.access(fullPath);
+    } catch {
+      throw new Error('File not found');
+    }
+
+    return fs.readFile(fullPath);
+  }
+
+  // Default to workspace directory
   const fullPath = path.join(workspaceDir, filepath);
 
   // Verify path is within workspace
@@ -205,12 +223,21 @@ export async function getFile(
 }
 
 /**
- * Delete file from session workspace
+ * Delete file from session workspace or project outputs directory
  */
 export async function deleteFile(
   workspaceDir: string,
   filepath: string
 ): Promise<void> {
+  // Check if file is in project outputs directory
+  if (filepath.startsWith('outputs/')) {
+    const projectRoot = process.cwd();
+    const fullPath = path.join(projectRoot, filepath);
+    await fs.unlink(fullPath);
+    return;
+  }
+
+  // Default to workspace directory
   const fullPath = path.join(workspaceDir, filepath);
 
   // Verify path is within workspace

@@ -27,13 +27,13 @@ interface PaperMetadata {
 
 /**
  * Web Search Tool
- * Searches academic papers from multiple sources
+ * Searches academic papers from multiple sources with retry and fallback strategies
  */
 export class WebSearchTool implements Tool {
   name = 'web_search';
-  description = 'Search academic papers and web resources from arXiv, alphaXiv, and Google Scholar. Returns normalized metadata including title, authors, date, venue, and links.';
+  description = 'Search academic papers and web resources from arXiv, alphaXiv, and Google Scholar. Returns normalized metadata including title, authors, date, venue, and links. Handles retry with query reformulation and fallback strategies.';
   requiresConfirmation = false;
-  timeout = 30000;
+  timeout = 60000; // Increased timeout to 60s for retry logic
 
   inputSchema = {
     type: 'object' as const,
@@ -62,13 +62,23 @@ export class WebSearchTool implements Tool {
         description: 'Sort order: relevance, date, citations (default: relevance)',
         enum: ['relevance', 'date', 'citations'],
       },
+      enableRetry: {
+        type: 'boolean' as const,
+        description: 'Enable automatic retry with query reformulation if no results found (default: true)',
+      },
+      maxRetries: {
+        type: 'number' as const,
+        description: 'Maximum number of retry attempts (default: 2)',
+        minimum: 0,
+        maximum: 5,
+      },
     },
     required: ['query'],
   };
 
   constructor(private context: ToolContext) {}
 
-  async execute(params: Record<string, any>): Promise<ToolResult> {
+  async execute(params: Record<string, any>, onProgress?: (current: number, total: number, message?: string) => void): Promise<ToolResult> {
     const startTime = Date.now();
 
     try {
@@ -77,6 +87,8 @@ export class WebSearchTool implements Tool {
       const topK = Math.min(Math.max((params.topK as number) || 5, 1), 20);
       const sortBy = (params.sortBy as string) || 'relevance';
       const dateRange = params.dateRange as string | undefined;
+      const enableRetry = params.enableRetry !== false; // Default true
+      const maxRetries = Math.min(Math.max((params.maxRetries as number) || 2, 0), 5);
 
       if (!query || typeof query !== 'string' || query.trim().length === 0) {
         return {
@@ -87,18 +99,69 @@ export class WebSearchTool implements Tool {
         };
       }
 
+      // Report initial progress
+      onProgress?.(0, 100, 'Preparing search...');
+
       // Determine which sources to search
       const sourcesToSearch: SearchSource[] = sources === 'all'
         ? ['arxiv', 'alphaxiv', 'google_scholar']
         : [sources];
 
-      let allResults: PaperMetadata[] = [];
+      // Try initial search
+      onProgress?.(10, 100, `Searching ${sourcesToSearch.length} source(s)...`);
+      let allResults: PaperMetadata[] = await this.performSearch(
+        sourcesToSearch,
+        query,
+        topK,
+        sortBy,
+        dateRange,
+        onProgress
+      );
 
-      // Search each source
-      for (const source of sourcesToSearch) {
-        const results = await this.searchSource(source, query, topK, sortBy, dateRange);
-        allResults = allResults.concat(results);
+      let searchAttempt = 1;
+      let usedFallback = false;
+
+      // Retry with fallback strategies if no results and retry is enabled
+      if (allResults.length === 0 && enableRetry) {
+        onProgress?.(40, 100, 'No results found, trying broader search...');
+        const reformulatedQueries = this.reformulateQuery(query);
+
+        for (const reformulatedQuery of reformulatedQueries) {
+          if (searchAttempt > maxRetries) break;
+          searchAttempt++;
+
+          console.log(`Search attempt ${searchAttempt}: Using reformulated query "${reformulatedQuery}"`);
+          onProgress?.(
+            40 + (searchAttempt * 10),
+            100,
+            `Trying alternative query (${searchAttempt}/${maxRetries + 1})...`
+          );
+
+          // Try without date range as fallback
+          const fallbackResults = await this.performSearch(
+            sourcesToSearch,
+            reformulatedQuery,
+            topK,
+            sortBy,
+            usedFallback ? undefined : dateRange, // Remove date range on first retry
+            onProgress
+          );
+
+          allResults = allResults.concat(fallbackResults);
+
+          if (allResults.length > 0) {
+            usedFallback = true;
+            break; // Stop retrying if we got results
+          }
+
+          usedFallback = true;
+        }
       }
+
+      onProgress?.(70, 100, 'Processing results...');
+
+      // Deduplicate results across sources
+      allResults = this.deduplicateResults(allResults);
 
       // Sort results based on sortBy preference
       allResults = this.sortResults(allResults, sortBy);
@@ -106,17 +169,35 @@ export class WebSearchTool implements Tool {
       // Limit to topK results total
       allResults = allResults.slice(0, topK);
 
+      onProgress?.(90, 100, 'Formatting output...');
+
       // Format output
-      const output = this.formatResults(allResults, query, sourcesToSearch, sortBy);
+      const output = this.formatResults(
+        allResults,
+        query,
+        sourcesToSearch,
+        sortBy,
+        searchAttempt > 1,
+        usedFallback
+      );
 
       return {
-        success: true,
+        success: allResults.length > 0,
         output,
         duration: Date.now() - startTime,
         artifacts: allResults.length > 0 ? [{
           type: 'data',
           name: 'search-results.json',
-          content: JSON.stringify(allResults, null, 2),
+          content: JSON.stringify({
+            query,
+            originalQuery: query,
+            sources: sourcesToSearch,
+            searchAttempts: searchAttempt,
+            usedFallback,
+            sortBy,
+            topK,
+            results: allResults,
+          }, null, 2),
           mimeType: 'application/json',
         }] : undefined,
       };
@@ -131,6 +212,37 @@ export class WebSearchTool implements Tool {
   }
 
   /**
+   * Perform search across all sources
+   */
+  private async performSearch(
+    sources: SearchSource[],
+    query: string,
+    limit: number,
+    sortBy: string,
+    dateRange?: string,
+    onProgress?: (current: number, total: number, message?: string) => void
+  ): Promise<PaperMetadata[]> {
+    const results: PaperMetadata[] = [];
+    const totalSources = sources.length;
+
+    // Search each source in parallel for better performance
+    const searchPromises = sources.map((source, index) =>
+      this.searchSource(source, query, limit, sortBy, dateRange, (current, total, msg) => {
+        // Report progress for each source
+        const progress = 10 + Math.floor((current / total + index) / totalSources * 30);
+        onProgress?.(progress, 100, `Searching ${source}... ${msg || ''}`);
+      })
+    );
+
+    const searchResults = await Promise.all(searchPromises);
+    searchResults.forEach(sourceResults => {
+      results.push(...sourceResults);
+    });
+
+    return results;
+  }
+
+  /**
    * Search a specific source
    */
   private async searchSource(
@@ -138,11 +250,12 @@ export class WebSearchTool implements Tool {
     query: string,
     limit: number,
     sortBy: string,
-    dateRange?: string
+    dateRange?: string,
+    onProgress?: (current: number, total: number, message?: string) => void
   ): Promise<PaperMetadata[]> {
     switch (source) {
       case 'arxiv':
-        return this.searchArXiv(query, limit, sortBy, dateRange);
+        return this.searchArXiv(query, limit, sortBy, dateRange, onProgress);
       case 'alphaxiv':
         return this.searchAlphaXiv(query, limit, sortBy);
       case 'google_scholar':
@@ -153,6 +266,92 @@ export class WebSearchTool implements Tool {
   }
 
   /**
+   * Reformulate query for retry attempts
+   * Creates broader search terms to improve result finding
+   */
+  private reformulateQuery(originalQuery: string): string[] {
+    const reformulations: string[] = [];
+
+    // Remove common prefixes like "paper about", "research on", "find"
+    const cleanedQuery = originalQuery
+      .replace(/^(papers? about|research on|find|search for|looking for|i need|find me)\s+/i, '')
+      .replace(/\s+(papers?|research|articles?)$/i, '')
+      .trim();
+
+    if (cleanedQuery !== originalQuery) {
+      reformulations.push(cleanedQuery);
+    }
+
+    // Extract key terms (remove stopwords)
+    const stopwords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from']);
+    const keyTerms = originalQuery
+      .split(/\s+/)
+      .filter(word => word.length > 2 && !stopwords.has(word.toLowerCase()))
+      .join(' ');
+
+    if (keyTerms !== cleanedQuery && keyTerms.length > 3) {
+      reformulations.push(keyTerms);
+    }
+
+    // If query contains quotes, remove them for broader search
+    if (originalQuery.includes('"')) {
+      reformulations.push(originalQuery.replace(/"/g, ''));
+    }
+
+    return reformulations;
+  }
+
+  /**
+   * Deduplicate results based on title similarity
+   * Removes papers that appear in multiple sources
+   */
+  private deduplicateResults(results: PaperMetadata[]): PaperMetadata[] {
+    const seen = new Map<string, PaperMetadata>();
+    const deduplicated: PaperMetadata[] = [];
+
+    for (const paper of results) {
+      // Normalize title for comparison (lowercase, remove punctuation, extra spaces)
+      const normalizedTitle = paper.title
+        .toLowerCase()
+        .replace(/[^\w\s]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      const existing = seen.get(normalizedTitle);
+
+      if (existing) {
+        // Keep the one from higher priority source or with more metadata
+        const sourcePriority: Record<string, number> = {
+          arxiv: 3,
+          alphaxiv: 2,
+          semantic_scholar: 1,
+        };
+
+        const existingPriority = sourcePriority[existing.source] || 0;
+        const currentPriority = sourcePriority[paper.source] || 0;
+
+        // Keep the one with higher priority, or merge if same priority
+        if (currentPriority > existingPriority) {
+          seen.set(normalizedTitle, paper);
+        } else if (currentPriority === existingPriority) {
+          // Merge metadata if from same priority source
+          if (paper.citations && !existing.citations) {
+            existing.citations = paper.citations;
+          }
+          if (paper.summary && !existing.summary) {
+            existing.summary = paper.summary;
+          }
+        }
+      } else {
+        seen.set(normalizedTitle, paper);
+        deduplicated.push(paper);
+      }
+    }
+
+    return deduplicated;
+  }
+
+  /**
    * Search arXiv API
    * arXiv provides a public API for searching and retrieving papers
    */
@@ -160,7 +359,8 @@ export class WebSearchTool implements Tool {
     query: string,
     limit: number,
     sortBy: string,
-    dateRange?: string
+    dateRange?: string,
+    onProgress?: (current: number, total: number, message?: string) => void
   ): Promise<PaperMetadata[]> {
     try {
       // arXiv search API URL
@@ -455,14 +655,32 @@ export class WebSearchTool implements Tool {
     results: PaperMetadata[],
     query: string,
     sources: SearchSource[],
-    sortBy: string
+    sortBy: string,
+    usedRetry = false,
+    usedFallback = false
   ): string {
     if (results.length === 0) {
-      return `No results found for query: "${query}" from sources: ${sources.join(', ')}`;
+      let output = `🔍 Search Results for: "${query}"\n`;
+      output += `📊 No papers found\n`;
+      output += `📌 Sources attempted: ${sources.join(', ')} | Sort: ${sortBy}\n`;
+      output += '='.repeat(60) + '\n\n';
+      output += `💡 Suggestions:\n`;
+      output += `   - Try broader search terms\n`;
+      output += `   - Remove specific keywords or filters\n`;
+      output += `   - Check spelling of key terms\n`;
+      output += `   - Try a different academic source\n`;
+      return output;
     }
 
     let output = `🔍 Search Results for: "${query}"\n`;
-    output += `📊 ${results.length} papers found | Sources: ${sources.join(', ')} | Sort: ${sortBy}\n`;
+    output += `📊 ${results.length} papers found | Sources: ${sources.join(', ')} | Sort: ${sortBy}`;
+    if (usedRetry) {
+      output += ` | Retry with reformulation: Enabled`;
+    }
+    if (usedFallback) {
+      output += ` | Fallback (broader search): Used`;
+    }
+    output += '\n';
     output += '='.repeat(60) + '\n\n';
 
     for (let i = 0; i < results.length; i++) {
@@ -487,7 +705,7 @@ export class WebSearchTool implements Tool {
       output += `📌 Source: ${paper.source}\n`;
 
       if (paper.summary) {
-        output += `\n📝 Summary:\n${paper.summary}\n`;
+        output += `\n📝 Summary:\n${paper.summary.substring(0, 500)}${paper.summary.length > 500 ? '...' : ''}\n`;
       }
 
       output += '\n' + '-'.repeat(40) + '\n\n';

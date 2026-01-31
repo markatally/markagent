@@ -30,6 +30,11 @@ export interface ToolResult {
   error?: string;
   duration: number;
   artifacts?: Artifact[];
+  progress?: {
+    current: number;
+    total: number;
+    message?: string;
+  };
 }
 
 export interface Artifact {

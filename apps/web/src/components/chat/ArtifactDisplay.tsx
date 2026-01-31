@@ -44,8 +44,53 @@ function getDownloadUrl(sessionId: string, fileId?: string): string {
   return '#';
 }
 
+/**
+ * Handle file download with proper error handling
+ * Uses fetch + blob to ensure the file is properly downloaded
+ */
+async function handleDownload(
+  e: React.MouseEvent<HTMLButtonElement>,
+  sessionId: string,
+  fileId: string | undefined,
+  filename: string
+): Promise<void> {
+  e.preventDefault();
+
+  if (!fileId) {
+    console.error('No fileId provided for download');
+    return;
+  }
+
+  try {
+    const url = getDownloadUrl(sessionId, fileId);
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || 'Download failed');
+    }
+
+    // Get blob and create download URL
+    const blob = await response.blob();
+    const downloadUrl = URL.createObjectURL(blob);
+
+    // Create temporary link and trigger download
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Clean up
+    URL.revokeObjectURL(downloadUrl);
+  } catch (error) {
+    console.error('Download failed:', error);
+    alert(`Failed to download file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
 export function ArtifactDisplay({ artifact, sessionId }: ArtifactDisplayProps) {
-  const downloadUrl = getDownloadUrl(sessionId, artifact.fileId);
   const fileSize = formatFileSize(artifact.size);
 
   return (
@@ -71,14 +116,13 @@ export function ArtifactDisplay({ artifact, sessionId }: ArtifactDisplayProps) {
             </div>
           </div>
           {artifact.type === 'file' && artifact.fileId && (
-            <a
-              href={downloadUrl}
-              download={artifact.name}
-              className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary text-primary-foreground text-sm font-medium rounded hover:bg-primary/90 transition-colors"
+            <button
+              onClick={(e) => handleDownload(e, sessionId, artifact.fileId, artifact.name)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary text-primary-foreground text-sm font-medium rounded hover:bg-primary/90 transition-colors cursor-pointer"
             >
               <Download className="h-4 w-4" />
               Download
-            </a>
+            </button>
           )}
         </div>
       </CardHeader>

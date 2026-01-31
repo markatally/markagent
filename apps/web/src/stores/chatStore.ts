@@ -8,6 +8,11 @@ interface ToolCallStatus {
   status: 'pending' | 'running' | 'completed' | 'failed';
   result?: ToolResult;
   error?: string;
+  progress?: {
+    current: number;
+    total: number;
+    message?: string;
+  };
 }
 
 interface ChatState {
@@ -21,6 +26,9 @@ interface ChatState {
 
   // Tool calls state
   toolCalls: Map<string, ToolCallStatus>;
+
+  // File artifacts by session ID (for file.created events)
+  files: Map<string, Artifact[]>;
 
   // Actions - Messages
   setMessages: (sessionId: string, messages: Message[]) => void;
@@ -37,8 +45,13 @@ interface ChatState {
   // Actions - Tool calls
   startToolCall: (toolCallId: string, toolName: string, params: any) => void;
   updateToolCall: (toolCallId: string, updates: Partial<ToolCallStatus>) => void;
+  updateToolCallProgress: (toolCallId: string, current: number, total: number, message?: string) => void;
   completeToolCall: (toolCallId: string, result: ToolResult) => void;
   clearToolCalls: () => void;
+
+  // Actions - Files
+  addFileArtifact: (sessionId: string, artifact: Artifact) => void;
+  clearFiles: (sessionId: string) => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -48,6 +61,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   streamingContent: '',
   isStreaming: false,
   toolCalls: new Map(),
+  files: new Map(),
 
   // Set messages for a session
   setMessages: (sessionId: string, messages: Message[]) => {
@@ -156,6 +170,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
+  // Update tool call progress
+  updateToolCallProgress: (toolCallId: string, current: number, total: number, message?: string) => {
+    set((state) => {
+      const newToolCalls = new Map(state.toolCalls);
+      const existing = newToolCalls.get(toolCallId);
+      if (existing) {
+        newToolCalls.set(toolCallId, {
+          ...existing,
+          progress: { current, total, message },
+        });
+      }
+      return { toolCalls: newToolCalls };
+    });
+  },
+
   // Complete a tool call
   completeToolCall: (toolCallId: string, result: ToolResult) => {
     set((state) => {
@@ -176,5 +205,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Clear all tool calls
   clearToolCalls: () => {
     set({ toolCalls: new Map() });
+  },
+
+  // Add a file artifact
+  addFileArtifact: (sessionId: string, artifact: Artifact) => {
+    set((state) => {
+      const newFiles = new Map(state.files);
+      const sessionFiles = newFiles.get(sessionId) || [];
+      newFiles.set(sessionId, [...sessionFiles, artifact]);
+      return { files: newFiles };
+    });
+  },
+
+  // Clear file artifacts for a session
+  clearFiles: (sessionId: string) => {
+    set((state) => {
+      const newFiles = new Map(state.files);
+      newFiles.delete(sessionId);
+      return { files: newFiles };
+    });
   },
 }));
