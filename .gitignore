@@ -49,6 +49,9 @@ apps/api/prisma/*.db-journal
 # Workspaces
 /workspaces/
 
+# Test symlinks (unnecessary with Bun)
+tests/node_modules
+
 # Generated outputs
 /outputs/
 /tmp/
