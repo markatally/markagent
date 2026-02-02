@@ -1,8 +1,8 @@
 {
   "llm": {
     "provider": "openai-compatible",
-    "baseUrl": "https://api.jiekou.ai/openai",
-    "model": "zai-org/glm-4.7",
+    "baseUrl": "https://api.openai.com/v1",
+    "model": "gpt-4o",
     "maxTokens": 131072,
     "temperature": 0.7,
     "timeout": 120000,
@@ -27,7 +27,7 @@
   },
   "sandbox": {
     "enabled": false,
-    "image": "manus-sandbox:latest",
+    "image": "mark-sandbox:latest",
     "memory": "512MB",
     "cpu": "1",
     "timeout": 300,

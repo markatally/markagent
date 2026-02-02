@@ -1,4 +1,4 @@
-# Manus Agent Sandbox Image
+# Mark Agent Sandbox Image
 # Isolated execution environment for user code
 FROM node:20-slim
 
@@ -39,15 +39,15 @@ RUN mkdir -p /workspace
 WORKDIR /workspace
 
 # Create non-root user for better security
-RUN useradd -m -s /bin/bash manus
-RUN chown -R manus:manus /workspace
+RUN useradd -m -s /bin/bash mark
+RUN chown -R mark:mark /workspace
 
 # Switch to non-root user
-USER manus
+USER mark
 
 # Set environment variables
 ENV HOME=/workspace
-ENV USER=manus
+ENV USER=mark
 
 # Default command (keep container running)
 CMD ["sleep", "infinity"]

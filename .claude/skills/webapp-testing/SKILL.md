@@ -1,11 +1,11 @@
 ---
 name: webapp-testing
-description: Guide for testing the Manus Agent web application using Vitest and Playwright. Use when writing unit tests, integration tests, E2E tests, or debugging test failures.
+description: Guide for testing the Mark Agent web application using Vitest and Playwright. Use when writing unit tests, integration tests, E2E tests, or debugging test failures.
 ---
 
 # Web Application Testing
 
-This skill provides guidance for testing the Manus Agent frontend and backend.
+This skill provides guidance for testing the Mark Agent frontend and backend.
 
 ## Testing Stack
 

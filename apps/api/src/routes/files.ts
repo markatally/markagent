@@ -93,7 +93,7 @@ files.post('/sessions/:sessionId/files', async (c) => {
   // Determine workspace directory
   const workspaceDir =
     session.workspacePath ||
-    path.join(process.env.WORKSPACE_ROOT || '/tmp/manus-workspaces', sessionId);
+    path.join(process.env.WORKSPACE_ROOT || '/tmp/mark-workspaces', sessionId);
 
   try {
     // Save file
@@ -231,7 +231,7 @@ files.get('/sessions/:sessionId/files/:fileId/download', async (c) => {
   // Determine workspace directory
   const workspaceDir =
     session.workspacePath ||
-    path.join(process.env.WORKSPACE_ROOT || '/tmp/manus-workspaces', sessionId);
+    path.join(process.env.WORKSPACE_ROOT || '/tmp/mark-workspaces', sessionId);
 
   try {
     // Read file
@@ -320,7 +320,7 @@ files.delete('/sessions/:sessionId/files/:fileId', async (c) => {
   // Determine workspace directory
   const workspaceDir =
     session.workspacePath ||
-    path.join(process.env.WORKSPACE_ROOT || '/tmp/manus-workspaces', sessionId);
+    path.join(process.env.WORKSPACE_ROOT || '/tmp/mark-workspaces', sessionId);
 
   try {
     // Delete file from disk

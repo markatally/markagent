@@ -15,7 +15,7 @@
 
 ### Quick Summary
 
-The Manus Agent is a **complete full-stack AI agent system** with:
+The Mark Agent is a **complete full-stack AI agent system** with:
 - ✅ Authentication & session management
 - ✅ LLM integration with streaming (GLM-4.7)
 - ✅ Tool system (file_reader, file_writer, bash_executor, ppt_generator, web_search)
@@ -170,7 +170,7 @@ The Manus Agent is a **complete full-stack AI agent system** with:
 ```bash
 # .env (required)
 LLM_API_KEY=<your_api_key>
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/manus
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/mark
 REDIS_URL=redis://localhost:6379
 JWT_SECRET=<generated>
 ENCRYPTION_KEY=<generated>
@@ -224,7 +224,7 @@ bun run test
 **Docker Sandbox Socket Fix:**
 - Fixed `FailedToOpenSocket` error for Docker operations
 - Added auto-detection for Docker socket (Colima, Docker Desktop, Podman)
-- Built `manus-sandbox:latest` Docker image
+- Built `mark-sandbox:latest` Docker image
 
 ### Session 8 — 2026-01-31
 

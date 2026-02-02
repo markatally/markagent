@@ -22,7 +22,7 @@ describe('Phase 4: Tool System', () => {
 
   beforeAll(async () => {
     // Create temporary workspace for testing
-    testWorkspace = path.join(os.tmpdir(), `manus-test-${Date.now()}`);
+    testWorkspace = path.join(os.tmpdir(), `mark-test-${Date.now()}`);
     await fs.mkdir(testWorkspace, { recursive: true });
 
     toolContext = {

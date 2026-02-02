@@ -16,7 +16,7 @@ interface ChatContainerProps {
 
 export function ChatContainer({ sessionId }: ChatContainerProps) {
   const [isSending, setIsSending] = useState(false);
-  const [files, setFiles] = useState<import('@manus/shared').Artifact[]>([]);
+  const [files, setFiles] = useState<import('@mark/shared').Artifact[]>([]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -87,7 +87,7 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
 
       case 'tool.complete':
         if (event.data) {
-          const toolResult: import('@manus/shared').ToolResult = {
+          const toolResult: import('@mark/shared').ToolResult = {
             success: true,
             output: event.data.result || '',
             duration: event.data.duration || 0,
@@ -98,7 +98,7 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
 
       case 'tool.error':
         if (event.data) {
-          const toolResult: import('@manus/shared').ToolResult = {
+          const toolResult: import('@mark/shared').ToolResult = {
             success: false,
             output: '',
             error: event.data.error || 'Unknown error',
@@ -111,7 +111,7 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
       case 'file.created':
         // File artifact created - add to local state for display
         if (event.data?.fileId && event.data?.filename) {
-          const artifact: import('@manus/shared').Artifact = {
+          const artifact: import('@mark/shared').Artifact = {
             fileId: event.data.fileId,
             name: event.data.filename,
             type: event.data.type || 'file',

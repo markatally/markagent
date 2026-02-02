@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "manus-agent",
+      "name": "mark-agent",
       "dependencies": {
         "dockerode": "^4.0.9",
         "pptxgenjs": "^4.0.1",
@@ -20,7 +20,7 @@
         "@anthropic-ai/sdk": "^0.72.1",
         "@hono/node-server": "^1.4.0",
         "@hono/zod-validator": "^0.7.6",
-        "@manus/shared": "workspace:*",
+        "@mark/shared": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.25.3",
         "@prisma/client": "^5.7.0",
         "arctic": "^3.7.0",
@@ -53,7 +53,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@hookform/resolvers": "^3.3.4",
-        "@manus/shared": "workspace:*",
+        "@mark/shared": "workspace:*",
         "@monaco-editor/react": "^4.6.0",
         "@radix-ui/react-alert-dialog": "^1.1.15",
         "@radix-ui/react-avatar": "^1.1.11",
@@ -102,7 +102,7 @@
       },
     },
     "packages/shared": {
-      "name": "@manus/shared",
+      "name": "@mark/shared",
       "version": "0.1.0",
       "devDependencies": {
         "@types/node": "^25.1.0",
@@ -265,7 +265,7 @@
 
     "@js-sdsl/ordered-map": ["@js-sdsl/ordered-map@4.4.2", "https://registry.npmmirror.com/@js-sdsl/ordered-map/-/ordered-map-4.4.2.tgz", {}, "sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw=="],
 
-    "@manus/shared": ["@manus/shared@workspace:packages/shared"],
+    "@mark/shared": ["@mark/shared@workspace:packages/shared"],
 
     "@modelcontextprotocol/sdk": ["@modelcontextprotocol/sdk@1.25.3", "https://registry.npmmirror.com/@modelcontextprotocol/sdk/-/sdk-1.25.3.tgz", { "dependencies": { "@hono/node-server": "^1.19.9", "ajv": "^8.17.1", "ajv-formats": "^3.0.1", "content-type": "^1.0.5", "cors": "^2.8.5", "cross-spawn": "^7.0.5", "eventsource": "^3.0.2", "eventsource-parser": "^3.0.0", "express": "^5.0.1", "express-rate-limit": "^7.5.0", "jose": "^6.1.1", "json-schema-typed": "^8.0.2", "pkce-challenge": "^5.0.0", "raw-body": "^3.0.0", "zod": "^3.25 || ^4.0", "zod-to-json-schema": "^3.25.0" }, "peerDependencies": { "@cfworker/json-schema": "^4.1.1" }, "optionalPeers": ["@cfworker/json-schema"] }, "sha512-vsAMBMERybvYgKbg/l4L1rhS7VXV1c0CtyJg72vwxONVX0l4ZfKVAnZEWTQixJGTzKnELjQ59e4NbdFDALRiAQ=="],
 

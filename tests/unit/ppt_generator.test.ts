@@ -41,7 +41,7 @@ describe('PptGeneratorTool', () => {
     const result = await tool.execute({
       presentation: {
         title: 'Test Presentation',
-        subtitle: 'Created by Manus Agent',
+        subtitle: 'Created by Mark Agent',
         slides: [
           {
             title: 'Introduction',
@@ -180,7 +180,7 @@ describe('PptGeneratorTool', () => {
       presentation: {
         title: 'Optional Fields Test',
         subtitle: 'With subtitle',
-        author: 'Manus Agent',
+        author: 'Mark Agent',
         slides: [
           {
             title: 'Slide with notes',

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/api';
 import { useToast } from './use-toast';
-import type { Session } from '@manus/shared';
+import type { Session } from '@mark/shared';
 
 /**
  * Fetch all sessions for the current user

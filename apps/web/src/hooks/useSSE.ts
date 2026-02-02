@@ -113,7 +113,7 @@ export function useSSE({ sessionId, enabled, onComplete, onError }: UseSSEOption
 
           case 'tool.complete':
             if (event.data) {
-              const toolResult: import('@manus/shared').ToolResult = {
+              const toolResult: import('@mark/shared').ToolResult = {
                 success: true,
                 output: event.data.result || '',
                 duration: event.data.duration || 0,
@@ -125,7 +125,7 @@ export function useSSE({ sessionId, enabled, onComplete, onError }: UseSSEOption
 
           case 'tool.error':
             if (event.data) {
-              const toolResult: import('@manus/shared').ToolResult = {
+              const toolResult: import('@mark/shared').ToolResult = {
                 success: false,
                 output: '',
                 error: event.data.error || 'Unknown error',
@@ -138,7 +138,7 @@ export function useSSE({ sessionId, enabled, onComplete, onError }: UseSSEOption
           case 'file.created':
             // File artifact created - add to store for independent display
             if (event.data?.fileId && event.data?.filename) {
-              const artifact: import('@manus/shared').Artifact = {
+              const artifact: import('@mark/shared').Artifact = {
                 fileId: event.data.fileId,
                 name: event.data.filename,
                 type: event.data.type || 'file',

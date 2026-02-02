@@ -1,7 +1,7 @@
-# AI Engineering Prompt: Build a Manus-Like Agentic System
+# AI Engineering Prompt: Build a Mark-Like Agentic System
 
 ## Project Overview
-Design and implement a complete full-stack web application that replicates Manus agent capabilities - an AI-powered autonomous agent that can execute complex tasks through natural language interaction, tool usage, and code execution.
+Design and implement a complete full-stack web application that replicates Mark agent capabilities - an AI-powered autonomous agent that can execute complex tasks through natural language interaction, tool usage, and code execution.
 
 ## Tech Stack Requirements
 
@@ -103,7 +103,7 @@ LLM_MODEL=zai-org/glm-4.7                   # Optional, overrides config
 ## Project Structure
 
 ```
-manus-agent/
+mark-agent/
 ├── apps/
 │   ├── web/                    # Frontend React application
 │   │   ├── src/
@@ -1299,7 +1299,7 @@ CREATE INDEX idx_messages_content_search ON messages USING gin(to_tsvector('engl
 ### Root package.json
 ```json
 {
-  "name": "manus-agent",
+  "name": "mark-agent",
   "private": true,
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
@@ -1404,7 +1404,7 @@ CREATE INDEX idx_messages_content_search ON messages USING gin(to_tsvector('engl
 ### Shared Package (packages/shared/package.json)
 ```json
 {
-  "name": "@manus/shared",
+  "name": "@mark/shared",
   "version": "0.0.1",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
@@ -2114,7 +2114,7 @@ services:
     ports:
       - "4000:4000"
     environment:
-      - DATABASE_URL=postgresql://manus:${POSTGRES_PASSWORD:-manus_password}@db:5432/manus
+      - DATABASE_URL=postgresql://mark:${POSTGRES_PASSWORD:-mark_password}@db:5432/mark
       - REDIS_URL=redis://redis:6379
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_BASE_URL=${LLM_BASE_URL:-https://api.jiekou.ai/openai}
@@ -2134,13 +2134,13 @@ services:
   db:
     image: postgres:16
     environment:
-      - POSTGRES_USER=manus
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-manus_password}
-      - POSTGRES_DB=manus
+      - POSTGRES_USER=mark
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mark_password}
+      - POSTGRES_DB=mark
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U manus"]
+      test: ["CMD-SHELL", "pg_isready -U mark"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -2159,7 +2159,7 @@ services:
     build: ./apps/api
     command: bun run worker
     environment:
-      - DATABASE_URL=postgresql://manus:${POSTGRES_PASSWORD:-manus_password}@db:5432/manus
+      - DATABASE_URL=postgresql://mark:${POSTGRES_PASSWORD:-mark_password}@db:5432/mark
       - REDIS_URL=redis://redis:6379
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_BASE_URL=${LLM_BASE_URL:-https://api.jiekou.ai/openai}
@@ -2290,7 +2290,7 @@ LLM_BASE_URL=https://api.jiekou.ai/openai
 LLM_MODEL=zai-org/glm-4.7
 
 # Database
-DATABASE_URL=postgresql://manus:manus_password@localhost:5432/manus
+DATABASE_URL=postgresql://mark:mark_password@localhost:5432/mark
 
 # Redis
 REDIS_URL=redis://localhost:6379
@@ -2314,15 +2314,15 @@ LOG_LEVEL=info
 DOCKER_HOST=unix:///var/run/docker.sock
 
 # Workspace directory
-WORKSPACE_ROOT=/tmp/manus-workspaces
+WORKSPACE_ROOT=/tmp/mark-workspaces
 ```
 
 ### Initial Setup
 
 ```bash
 # 1. Clone and install dependencies
-git clone <repo-url> manus-agent
-cd manus-agent
+git clone <repo-url> mark-agent
+cd mark-agent
 bun install  # or npm install
 
 # 2. Set up environment

@@ -1,6 +1,6 @@
 # Test Suite
 
-This directory contains all tests for the Manus Agent project.
+This directory contains all tests for the Mark Agent project.
 
 ## Directory Structure
 

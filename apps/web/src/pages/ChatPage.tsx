@@ -21,7 +21,7 @@ export function ChatPage() {
             <div className="text-center space-y-4">
               <MessageSquare className="mx-auto h-12 w-12 text-muted-foreground" />
               <div>
-                <h2 className="text-xl font-semibold">Welcome to Manus Agent</h2>
+                <h2 className="text-xl font-semibold">Welcome to Mark Agent</h2>
                 <p className="text-sm text-muted-foreground mt-2">
                   Select a session from the sidebar or create a new one to get started
                 </p>

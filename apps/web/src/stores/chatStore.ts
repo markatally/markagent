@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Message, ToolResult, Artifact } from '@manus/shared';
+import type { Message, ToolResult, Artifact } from '@mark/shared';
 
 interface ToolCallStatus {
   toolCallId: string;

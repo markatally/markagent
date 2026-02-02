@@ -24,7 +24,7 @@ describe('Phase 6.2: File Upload/Download', () => {
 
   beforeAll(async () => {
     // Create temporary workspace for testing
-    testWorkspace = path.join(os.tmpdir(), `manus-files-test-${Date.now()}`);
+    testWorkspace = path.join(os.tmpdir(), `mark-files-test-${Date.now()}`);
     await fs.mkdir(testWorkspace, { recursive: true });
   });
 

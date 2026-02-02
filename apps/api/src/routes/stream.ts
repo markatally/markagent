@@ -462,7 +462,7 @@ stream.get('/sessions/:sessionId/stream', async (c) => {
   );
 
   // Set up tool context
-  const workspaceDir = session.workspacePath || path.join(process.env.WORKSPACE_ROOT || '/tmp/manus-workspaces', sessionId);
+  const workspaceDir = session.workspacePath || path.join(process.env.WORKSPACE_ROOT || '/tmp/mark-workspaces', sessionId);
   const toolContext: ToolContext = {
     sessionId,
     userId: user.userId,
@@ -712,7 +712,7 @@ stream.post('/sessions/:sessionId/chat', async (c) => {
   );
 
   // Set up tool context
-  const workspaceDir = session.workspacePath || path.join(process.env.WORKSPACE_ROOT || '/tmp/manus-workspaces', sessionId);
+  const workspaceDir = session.workspacePath || path.join(process.env.WORKSPACE_ROOT || '/tmp/mark-workspaces', sessionId);
   const toolContext: ToolContext = {
     sessionId,
     userId: user.userId,
@@ -932,7 +932,7 @@ stream.post('/sessions/:sessionId/agent', async (c) => {
   });
 
   // Set up context
-  const workspaceDir = session.workspacePath || path.join(process.env.WORKSPACE_ROOT || '/tmp/manus-workspaces', sessionId);
+  const workspaceDir = session.workspacePath || path.join(process.env.WORKSPACE_ROOT || '/tmp/mark-workspaces', sessionId);
   const toolContext: ToolContext = {
     sessionId,
     userId: user.userId,

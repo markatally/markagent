@@ -90,7 +90,7 @@ export function Sidebar({ className }: SidebarProps) {
       >
         {/* Header */}
         <div className="flex h-16 items-center justify-between border-b px-4">
-          <h1 className="text-lg font-semibold">Manus Agent</h1>
+          <h1 className="text-lg font-semibold">Mark Agent</h1>
         </div>
 
         {/* New Session Button */}

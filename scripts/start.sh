@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Manus Agent - One-click Service Startup
+# Mark Agent - One-click Service Startup
 # Usage: ./start.sh [options]
 #   --build-sandbox  Build the Docker sandbox image
 #   --reset-db       Reset and re-migrate the database
@@ -36,7 +36,7 @@ for arg in "$@"; do
       shift
       ;;
     --help)
-      echo "Manus Agent - One-click Service Startup"
+      echo "Mark Agent - One-click Service Startup"
       echo ""
       echo "Usage: ./start.sh [options]"
       echo ""
@@ -56,7 +56,7 @@ for arg in "$@"; do
 done
 
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}   Manus Agent - Starting Services${NC}"
+echo -e "${BLUE}   Mark Agent - Starting Services${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
@@ -149,7 +149,7 @@ if [ ! -f .env ]; then
   echo -e "${YELLOW}  Creating .env file...${NC}"
   cat > .env << 'EOF'
 # Database
-DATABASE_URL=postgresql://manus:manus_dev_password@localhost:5432/manus_agent
+DATABASE_URL=postgresql://mark:mark_dev_password@localhost:5432/mark_agent
 
 # Redis
 REDIS_URL=redis://localhost:6379
@@ -211,7 +211,7 @@ echo -e "${GREEN}  ✓ Dependencies installed and database migrated${NC}"
 # Step 6: Build sandbox image (optional)
 if $BUILD_SANDBOX; then
   echo -e "${YELLOW}[6/7] Building sandbox Docker image...${NC}"
-  docker build -t manus-sandbox:latest docker/sandbox/
+  docker build -t mark-sandbox:latest docker/sandbox/
   echo -e "${GREEN}  ✓ Sandbox image built${NC}"
 else
   echo -e "${YELLOW}[6/7] Skipping sandbox build (use --build-sandbox to build)${NC}"
@@ -246,7 +246,7 @@ sleep 3
 
 echo ""
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}   Manus Agent Started Successfully!${NC}"
+echo -e "${GREEN}   Mark Agent Started Successfully!${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "  ${BLUE}Frontend:${NC}    http://localhost:3000"

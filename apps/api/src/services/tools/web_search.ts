@@ -385,7 +385,7 @@ export class WebSearchTool implements Tool {
 
       const response = await fetch(`${baseUrl}?${searchParams}`, {
         headers: {
-          'User-Agent': 'Manus-Agent/1.0',
+          'User-Agent': 'Mark-Agent/1.0',
         },
       });
 
@@ -515,7 +515,7 @@ export class WebSearchTool implements Tool {
 
       const response = await fetch(`${baseUrl}?${searchParams}`, {
         headers: {
-          'User-Agent': 'Manus-Agent/1.0',
+          'User-Agent': 'Mark-Agent/1.0',
         },
       });
 
@@ -573,7 +573,7 @@ export class WebSearchTool implements Tool {
 
       const response = await fetch(`${baseUrl}?${searchParams}`, {
         headers: {
-          'User-Agent': 'Manus-Agent/1.0',
+          'User-Agent': 'Mark-Agent/1.0',
         },
       });
 

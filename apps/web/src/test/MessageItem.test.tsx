@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MessageItem } from '../components/chat/MessageItem';
-import type { Message } from '@manus/shared';
+import type { Message } from '@mark/shared';
 
 describe('MessageItem', () => {
   const mockUserMessage: Message = {

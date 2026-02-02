@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Manus Agent - Restart All Services
+# Mark Agent - Restart All Services
 # Usage: ./restart.sh [options]
 #   --all           Also restart Docker containers (PostgreSQL, Redis)
 #   --build-sandbox  Rebuild Docker sandbox image
@@ -42,7 +42,7 @@ for arg in "$@"; do
       START_ARGS+=("--reset-db")
       ;;
     --help)
-      echo "Manus Agent - Restart All Services"
+      echo "Mark Agent - Restart All Services"
       echo ""
       echo "Usage: ./restart.sh [options]"
       echo ""
@@ -65,7 +65,7 @@ for arg in "$@"; do
 done
 
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}   Manus Agent - Restarting${NC}"
+echo -e "${BLUE}   Mark Agent - Restarting${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 

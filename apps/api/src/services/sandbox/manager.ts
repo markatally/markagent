@@ -14,7 +14,7 @@ import type {
 } from './types';
 import { getConfig } from '../config';
 
-const DEFAULT_IMAGE = 'manus-sandbox:latest';
+const DEFAULT_IMAGE = 'mark-sandbox:latest';
 
 /**
  * Get Docker socket path, checking common locations
@@ -132,7 +132,7 @@ export class SandboxManager {
 
     // Also check if a Docker container with this name already exists
     // (can happen if server restarted without proper cleanup)
-    const containerName = `manus-sandbox-${sessionId}`;
+    const containerName = `mark-sandbox-${sessionId}`;
     try {
       const existingContainers = await this.docker.listContainers({
         all: true,
@@ -164,12 +164,12 @@ export class SandboxManager {
       // Create container
       const container = await this.docker.createContainer({
         Image: this.config.image || DEFAULT_IMAGE,
-        name: `manus-sandbox-${sessionId}`,
+        name: `mark-sandbox-${sessionId}`,
         Tty: true,
         Env: [
           `SESSION_ID=${sessionId}`,
           `HOME=/workspace`,
-          `USER=manus`,
+          `USER=mark`,
           ...Object.entries(env).map(([k, v]) => `${k}=${v}`),
         ],
         HostConfig: {
@@ -192,7 +192,7 @@ export class SandboxManager {
           ReadonlyRootfs: false,
         },
         WorkingDir: '/workspace',
-        User: 'manus',
+        User: 'mark',
       });
 
       // Start the container

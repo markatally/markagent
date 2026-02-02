@@ -16,7 +16,7 @@ describe('Phase 6.1: Docker Sandbox', () => {
 
   beforeAll(async () => {
     // Create temporary workspace for testing
-    testWorkspace = path.join(os.tmpdir(), `manus-sandbox-test-${Date.now()}`);
+    testWorkspace = path.join(os.tmpdir(), `mark-sandbox-test-${Date.now()}`);
     await fs.mkdir(testWorkspace, { recursive: true });
   });
 

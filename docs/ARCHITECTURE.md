@@ -1,4 +1,4 @@
-# Manus Agent: Full-Stack Architecture Explained
+# Mark Agent: Full-Stack Architecture Explained
 
 **For beginners who want to understand the system, not just the parts.**
 

@@ -1,7 +1,7 @@
 import { formatDistanceToNow } from 'date-fns';
 import { MessageSquare, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import type { Session } from '@manus/shared';
+import type { Session } from '@mark/shared';
 import { cn } from '../../lib/utils';
 import {
   AlertDialog,

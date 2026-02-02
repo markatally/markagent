@@ -1,4 +1,4 @@
-# Manus Agent
+# Mark Agent
 
 AI-powered autonomous agent that executes complex tasks through natural language interaction, tool usage, and code execution.
 
@@ -53,7 +53,7 @@ bun run dev:web  # Frontend on http://localhost:3000
 ## Project Structure
 
 ```
-manus-agent/
+mark-agent/
 ├── apps/
 │   ├── web/           # React frontend
 │   └── api/           # Hono backend

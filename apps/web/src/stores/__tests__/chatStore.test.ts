@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useChatStore } from '../chatStore';
-import type { Message } from '@manus/shared';
+import type { Message } from '@mark/shared';
 
 describe('chatStore', () => {
   beforeEach(() => {

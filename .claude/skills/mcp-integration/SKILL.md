@@ -1,21 +1,21 @@
 ---
 name: mcp-integration
-description: Guide for implementing and extending MCP (Model Context Protocol) integrations in Manus Agent. Use when adding new MCP servers, implementing MCP tools, or debugging MCP connections.
+description: Guide for implementing and extending MCP (Model Context Protocol) integrations in Mark Agent. Use when adding new MCP servers, implementing MCP tools, or debugging MCP connections.
 ---
 
 # MCP Integration Development
 
-This skill provides guidance for working with MCP (Model Context Protocol) in the Manus Agent.
+This skill provides guidance for working with MCP (Model Context Protocol) in the Mark Agent.
 
 ## Overview
 
-MCP enables the agent to interact with external services through standardized tools and resources. The Manus Agent supports multiple MCP server connections.
+MCP enables the agent to interact with external services through standardized tools and resources. The Mark Agent supports multiple MCP server connections.
 
 ## MCP Architecture
 
 ```
 ┌─────────────────┐
-│   Manus Agent   │
+│   Mark Agent   │
 │   (MCP Client)  │
 └────────┬────────┘
          │ JSON-RPC
@@ -45,7 +45,7 @@ Before implementing an MCP server:
 Define MCP servers in `apps/api/src/services/mcp/servers.ts`:
 
 ```typescript
-import { MCPServerConfig } from '@manus/shared';
+import { MCPServerConfig } from '@mark/shared';
 
 export const mcpServers: MCPServerConfig[] = [
   {
@@ -81,7 +81,7 @@ export class MCPClient {
       env: config.env,
     });
 
-    const client = new Client({ name: 'manus-agent', version: '1.0.0' });
+    const client = new Client({ name: 'mark-agent', version: '1.0.0' });
     await client.connect(transport);
 
     this.clients.set(config.name, client);

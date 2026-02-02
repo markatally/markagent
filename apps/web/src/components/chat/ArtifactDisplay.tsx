@@ -1,7 +1,7 @@
 import { FileText, FileImage, FileCode, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
-import type { Artifact } from '@manus/shared';
+import type { Artifact } from '@mark/shared';
 import { filesApi } from '../../lib/api';
 
 interface ArtifactDisplayProps {

@@ -26,7 +26,7 @@ const EXAMPLE_PRESENTATIONS = [
   {
     title: "Introduction to Artificial Intelligence",
     subtitle: "A Comprehensive Overview",
-    author: "Manus Agent",
+    author: "Mark Agent",
     slides: [
       {
         title: "What is AI?",
@@ -135,7 +135,7 @@ async function generatePPT(presentation: any): Promise<{ filepath: string; size:
 
   // Set metadata
   pptx.title = presentation.title;
-  pptx.author = presentation.author || 'Manus Agent';
+  pptx.author = presentation.author || 'Mark Agent';
   pptx.subject = presentation.title;
 
   // Create title slide
@@ -291,7 +291,7 @@ async function runTests() {
     const complexPresentation = {
       title: "Project Roadmap 2024",
       subtitle: "Q1-Q4 Planning",
-      author: "Manus Agent",
+      author: "Mark Agent",
       slides: [
         {
           title: "Q1 Goals",

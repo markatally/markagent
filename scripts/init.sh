@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Manus Agent - Local Environment Initialization Script
+# Mark Agent - Local Environment Initialization Script
 # This script sets up PostgreSQL, Redis, and other dependencies for local development
 
 set -e  # Exit on error
@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-WORKSPACE_ROOT="${WORKSPACE_ROOT:-/tmp/manus-workspaces}"
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-/tmp/mark-workspaces}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -104,8 +104,16 @@ detect_docker() {
 start_docker() {
     if [ "$DOCKER_CMD" = "colima" ]; then
         if ! colima status &> /dev/null; then
+            # Release any stuck disk (fixes: "attach disk colima, in use by instance colima")
+            print_info "Releasing Colima disk (stop any stale instance)..."
+            colima stop --force 2>/dev/null || true
+            sleep 2
             print_info "Starting Colima (this may take a minute)..."
-            colima start --cpu 2 --memory 4 --disk 60
+            if ! colima start --cpu 2 --memory 4 --disk 60; then
+                print_error "Colima failed to start."
+                print_info "Try a full reset: colima stop --force && colima delete --force && colima start --cpu 2 --memory 4 --disk 60"
+                return 1
+            fi
             print_success "Colima started"
         else
             print_success "Colima is already running"
@@ -160,7 +168,7 @@ start_infrastructure() {
     max_attempts=30
     attempt=0
     while [ $attempt -lt $max_attempts ]; do
-        if docker-compose exec -T db pg_isready -U manus &> /dev/null; then
+        if docker-compose exec -T db pg_isready -U mark &> /dev/null; then
             print_success "PostgreSQL is ready"
             break
         fi
@@ -215,7 +223,7 @@ setup_environment() {
         print_info "Creating .env file..."
         cat > .env << EOF
 # PostgreSQL
-DATABASE_URL=postgresql://manus:manus_password@localhost:5432/manus
+DATABASE_URL=postgresql://mark:mark_password@localhost:5432/mark
 
 # Redis
 REDIS_URL=redis://localhost:6379
@@ -295,8 +303,8 @@ build_sandbox_image() {
 
     cd "$PROJECT_ROOT"
 
-    if docker images | grep -q "manus-sandbox"; then
-        print_info "manus-sandbox image already exists"
+    if docker images | grep -q "mark-sandbox"; then
+        print_info "mark-sandbox image already exists"
         read -p "Rebuild sandbox image? [y/N] " -n 1 -r
         echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -304,11 +312,11 @@ build_sandbox_image() {
         fi
     fi
 
-    if ! docker build -t manus-sandbox:latest -f docker/sandbox/Dockerfile . &> /dev/null; then
+    if ! docker build -t mark-sandbox:latest -f docker/sandbox/Dockerfile . &> /dev/null; then
         print_error "Failed to build sandbox image"
         return 1
     fi
-    print_success "Sandbox image built: manus-sandbox:latest"
+    print_success "Sandbox image built: mark-sandbox:latest"
 }
 
 # Run tests
@@ -359,7 +367,7 @@ print_summary() {
 
 # Main execution
 main() {
-    print_section "Manus Agent - Local Environment Setup"
+    print_section "Mark Agent - Local Environment Setup"
 
     # Step 1: Detect and start Docker (install Colima on macOS if needed)
     if ! detect_docker; then

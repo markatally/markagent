@@ -19,7 +19,7 @@ services:
     ports:
       - "4000:4000"
     environment:
-      - DATABASE_URL=postgresql://manus:${POSTGRES_PASSWORD:-manus_password}@db:5432/manus
+      - DATABASE_URL=postgresql://mark:${POSTGRES_PASSWORD:-mark_password}@db:5432/mark
       - REDIS_URL=redis://redis:6379
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_BASE_URL=${LLM_BASE_URL:-https://api.jiekou.ai/openai}
@@ -44,7 +44,7 @@ services:
       dockerfile: docker/Dockerfile.api
     command: bun run worker
     environment:
-      - DATABASE_URL=postgresql://manus:${POSTGRES_PASSWORD:-manus_password}@db:5432/manus
+      - DATABASE_URL=postgresql://mark:${POSTGRES_PASSWORD:-mark_password}@db:5432/mark
       - REDIS_URL=redis://redis:6379
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_BASE_URL=${LLM_BASE_URL:-https://api.jiekou.ai/openai}
@@ -64,15 +64,15 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      - POSTGRES_USER=manus
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-manus_password}
-      - POSTGRES_DB=manus
+      - POSTGRES_USER=mark
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mark_password}
+      - POSTGRES_DB=mark
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U manus"]
+      test: ["CMD-SHELL", "pg_isready -U mark"]
       interval: 5s
       timeout: 5s
       retries: 5

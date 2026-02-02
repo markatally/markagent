@@ -117,7 +117,7 @@ export class BashExecutorTool implements Tool {
       });
 
       // Convert host path to container path
-      // Host: /tmp/manus-workspaces/{sessionId}/subdir
+      // Host: /tmp/mark-workspaces/{sessionId}/subdir
       // Container: /workspace/subdir
       let containerWorkDir = '/workspace';
       if (cwd !== this.context.workspaceDir) {
@@ -176,7 +176,7 @@ export class BashExecutorTool implements Tool {
         env: {
           ...process.env,
           HOME: this.context.workspaceDir,
-          USER: 'manus',
+          USER: 'mark',
         },
       });
 

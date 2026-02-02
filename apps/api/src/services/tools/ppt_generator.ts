@@ -140,7 +140,7 @@ export class PptGeneratorTool implements Tool {
 
       // Set metadata
       pptx.title = presentation.title;
-      pptx.author = presentation.author || 'Manus Agent';
+      pptx.author = presentation.author || 'Mark Agent';
       pptx.subject = presentation.title;
 
       // Create title slide

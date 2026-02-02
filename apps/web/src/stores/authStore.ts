@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { User } from '@manus/shared';
+import type { User } from '@mark/shared';
 import { apiClient, setTokens, clearTokens, getAccessToken } from '../lib/api';
 
 interface AuthState {

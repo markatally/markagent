@@ -1,11 +1,11 @@
 ---
 name: react-components
-description: Guide for building React components with TypeScript, Tailwind CSS, and shadcn/ui in the Manus Agent frontend. Use when creating UI components, implementing state management, handling real-time updates, or styling interfaces.
+description: Guide for building React components with TypeScript, Tailwind CSS, and shadcn/ui in the Mark Agent frontend. Use when creating UI components, implementing state management, handling real-time updates, or styling interfaces.
 ---
 
 # React Component Development
 
-This skill provides guidance for building frontend components in the Manus Agent.
+This skill provides guidance for building frontend components in the Mark Agent.
 
 ## Tech Stack
 

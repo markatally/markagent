@@ -1,12 +1,12 @@
-# Manus Agent Concepts for Beginners
+# Mark Agent Concepts for Beginners
 
-This guide explains all the technical terms, concepts, and architecture used in Manus Agent. It's designed for new coders who want to understand the project quickly.
+This guide explains all the technical terms, concepts, and architecture used in Mark Agent. It's designed for new coders who want to understand the project quickly.
 
 ---
 
 ## Table of Contents
 
-1. [What is Manus Agent?](#what-is-manus-agent)
+1. [What is Mark Agent?](#what-is-mark-agent)
 2. [Core Concepts](#core-concepts)
 3. [Tech Stack Explained](#tech-stack-explained)
 4. [Project Architecture](#project-architecture)
@@ -16,9 +16,9 @@ This guide explains all the technical terms, concepts, and architecture used in 
 
 ---
 
-## What is Manus Agent?
+## What is Mark Agent?
 
-**Manus Agent** is an AI-powered autonomous agent that can execute complex tasks through natural language. Think of it as an AI assistant that can:
+**Mark Agent** is an AI-powered autonomous agent that can execute complex tasks through natural language. Think of it as an AI assistant that can:
 - Write and execute code
 - Use tools (read files, run commands, search the web)
 - Break down complex tasks into steps
@@ -50,7 +50,7 @@ This guide explains all the technical terms, concepts, and architecture used in 
 
 **What it is**: The AI brain that understands and generates text.
 
-**In Manus Agent**:
+**In Mark Agent**:
 - Model used: GLM-4.7
 - Purpose: Understands your requests and decides what to do
 - How it works: Converts text into actions
@@ -61,7 +61,7 @@ This guide explains all the technical terms, concepts, and architecture used in 
 
 **What they are**: Specific actions the agent can perform.
 
-**Built-in tools in Manus Agent**:
+**Built-in tools in Mark Agent**:
 - `file_reader` - Reads file contents
 - `file_writer` - Creates or modifies files
 - `bash_executor` - Runs shell commands
@@ -222,9 +222,9 @@ await db.query('INSERT INTO users (email) VALUES ($1)', ['test@example.com']);
 **What is a monorepo?**
 Multiple related projects in one repository.
 
-**Manus Agent structure**:
+**Mark Agent structure**:
 ```
-manus-agent/
+mark-agent/
 ├── apps/
 │   ├── web/          # Frontend React app
 │   └── api/          # Backend server
@@ -613,7 +613,7 @@ manus-agent/
 
 **WebSocket**
 - Two-way real-time communication
-- Not used in Manus (we use SSE)
+- Not used in Mark Agent (we use SSE)
 
 ### Z
 

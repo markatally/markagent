@@ -10,7 +10,7 @@
     "noEmit": false,
     "paths": {
       "@/*": ["./src/*"],
-      "@manus/shared": ["../../packages/shared/src"]
+      "@mark/shared": ["../../packages/shared/src"]
     }
   },
   "include": ["src/**/*"],

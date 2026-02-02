@@ -1,5 +1,5 @@
-// Re-export all shared types from @manus/shared
-export * from '@manus/shared';
+// Re-export all shared types from @mark/shared
+export * from '@mark/shared';
 
 // Frontend-specific types
 

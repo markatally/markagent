@@ -1,4 +1,4 @@
-import type { JSONSchema } from '@manus/shared';
+import type { JSONSchema } from '@mark/shared';
 
 /**
  * Tool execution result

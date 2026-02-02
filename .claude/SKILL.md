@@ -1,15 +1,15 @@
 ---
-name: manus-agent
-description: Guide for developing and extending the Manus Agent - an AI-powered autonomous agent with tool execution, MCP integration, and sandbox capabilities. Use this skill when working on agent features, adding skills/tools, implementing API endpoints, or debugging the agent system.
+name: mark-agent
+description: Guide for developing and extending the Mark Agent - an AI-powered autonomous agent with tool execution, MCP integration, and sandbox capabilities. Use this skill when working on agent features, adding skills/tools, implementing API endpoints, or debugging the agent system.
 ---
 
-# Manus Agent Development
+# Mark Agent Development
 
-This skill provides specialized guidance for developing and extending the Manus Agent codebase.
+This skill provides specialized guidance for developing and extending the Mark Agent codebase.
 
 ## Project Context
 
-Manus Agent is a full-stack TypeScript monorepo that implements an autonomous AI agent with:
+Mark Agent is a full-stack TypeScript monorepo that implements an autonomous AI agent with:
 - Natural language task execution
 - Tool calling and code execution
 - MCP (Model Context Protocol) integration
@@ -192,7 +192,7 @@ for await (const chunk of stream) {
 ### Error Handling Pattern
 
 ```typescript
-import { ErrorCodes } from '@manus/shared';
+import { ErrorCodes } from '@mark/shared';
 
 try {
   // Operation

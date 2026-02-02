@@ -39,7 +39,7 @@ When updating, always include:
 
 ## Project Overview
 
-Manus Agent is an AI-powered autonomous agent that executes complex tasks through natural language interaction, tool usage, and code execution. It's a full-stack TypeScript monorepo using Bun.
+Mark Agent is an AI-powered autonomous agent that executes complex tasks through natural language interaction, tool usage, and code execution. It's a full-stack TypeScript monorepo using Bun.
 
 ## Technical Specification
 
@@ -73,7 +73,7 @@ When implementing features, consult SPEC.md for:
 ## Project Structure
 
 ```
-manus-agent/
+mark-agent/
 ├── apps/
 │   ├── web/                    # React frontend (Vite)
 │   │   └── src/
@@ -105,10 +105,10 @@ This repo has TWO different skill systems - do not confuse them:
 
 | Directory | Purpose | Format | Used By |
 |-----------|---------|--------|---------|
-| `skills/` | Product features (slash commands for Manus Agent users) | TypeScript `.ts` | End users at runtime |
+| `skills/` | Product features (slash commands for Mark Agent users) | TypeScript `.ts` | End users at runtime |
 | `.claude/skills/` | Development guidance for coding on this project | SKILL.md | Claude Code (AI) at dev time |
 
-- **`skills/*.ts`** = Source code for the Manus Agent product (e.g., `/code`, `/debug`)
+- **`skills/*.ts`** = Source code for the Mark Agent product (e.g., `/code`, `/debug`)
 - **`.claude/skills/*/SKILL.md`** = Instructions for Claude Code to help develop this codebase
 
 ## Project Conventions

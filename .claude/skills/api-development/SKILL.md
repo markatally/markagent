@@ -1,11 +1,11 @@
 ---
 name: api-development
-description: Guide for developing REST APIs with Hono, TypeScript, Prisma, and Zod in the Manus Agent backend. Use when creating endpoints, implementing authentication, handling validation, or working with the database.
+description: Guide for developing REST APIs with Hono, TypeScript, Prisma, and Zod in the Mark Agent backend. Use when creating endpoints, implementing authentication, handling validation, or working with the database.
 ---
 
 # API Development
 
-This skill provides guidance for developing backend APIs in the Manus Agent.
+This skill provides guidance for developing backend APIs in the Mark Agent.
 
 ## Tech Stack
 

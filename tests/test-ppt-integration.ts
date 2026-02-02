@@ -21,7 +21,7 @@ const TEST_CASES = [
       presentation: {
         title: 'AI for Everyone',
         subtitle: 'Understanding Artificial Intelligence',
-        author: 'Manus Agent',
+        author: 'Mark Agent',
         slides: [
           {
             title: 'What is AI?',

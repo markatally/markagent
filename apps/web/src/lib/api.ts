@@ -1,4 +1,4 @@
-import type { User, Session, Message } from '@manus/shared';
+import type { User, Session, Message } from '@mark/shared';
 import { useAuthStore } from '../stores/authStore';
 
 // API base URL (proxied through Vite dev server)

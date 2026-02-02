@@ -48,7 +48,7 @@ class MCPClientConnection {
       // Create client
       this.client = new Client(
         {
-          name: 'manus-agent',
+          name: 'mark-agent',
           version: '1.0.0',
         },
         {

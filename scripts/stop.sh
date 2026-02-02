@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Manus Agent - Stop All Services
+# Mark Agent - Stop All Services
 # Usage: ./stop.sh [--all]
 #   --all  Also stop Docker containers (PostgreSQL, Redis)
 
@@ -27,7 +27,7 @@ for arg in "$@"; do
   esac
 done
 
-echo -e "${YELLOW}Stopping Manus Agent services...${NC}"
+echo -e "${YELLOW}Stopping Mark Agent services...${NC}"
 
 # Stop frontend (port 3000)
 if lsof -ti:3000 &>/dev/null; then
