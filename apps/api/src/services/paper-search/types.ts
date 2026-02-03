@@ -66,11 +66,33 @@ export interface ResolvedPaper {
   exclusionReasons?: string[];
 }
 
+/**
+ * Absolute date window for filtering papers
+ * Computed from user input BEFORE search to prevent time-range drift
+ */
+export interface AbsoluteDateWindow {
+  /** Inclusive start date (YYYY-MM-DD) */
+  startDate: string;
+  /** Inclusive end date (YYYY-MM-DD) */
+  endDate: string;
+  /** 
+   * If true, this is an EXPLICIT user constraint that MUST NOT be expanded.
+   * When strict=true:
+   * - Retry logic MUST NOT remove or expand the date filter
+   * - Post-search validation MUST exclude papers outside this window
+   * - Papers without dates are excluded
+   */
+  strict: boolean;
+}
+
 /** Options for a single skill search */
 export interface PaperSearchSkillOptions {
   limit: number;
   sortBy?: 'relevance' | 'date' | 'citations';
+  /** @deprecated Use absoluteDateWindow instead for precise control */
   dateRange?: string;
+  /** Absolute date window - takes precedence over dateRange */
+  absoluteDateWindow?: AbsoluteDateWindow;
 }
 
 /**
@@ -97,7 +119,16 @@ export interface PaperSearchOrchestratorInput {
   skillIds: string[];
   limit: number;
   sortBy?: 'relevance' | 'date' | 'citations';
+  /** @deprecated Use absoluteDateWindow instead */
   dateRange?: string;
+  /** 
+   * Absolute date window for filtering - PREFERRED over dateRange
+   * When provided, this takes precedence and enables:
+   * - Query-time filtering in search APIs
+   * - Post-search verification
+   * - Strict mode enforcement (no fallback expansion)
+   */
+  absoluteDateWindow?: AbsoluteDateWindow;
 }
 
 /** Output from the orchestrator */

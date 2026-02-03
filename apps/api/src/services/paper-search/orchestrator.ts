@@ -137,8 +137,16 @@ export function createPaperSearchOrchestrator(deps: OrchestratorDeps) {
   return async function run(
     input: PaperSearchOrchestratorInput
   ): Promise<PaperSearchOrchestratorOutput> {
-    const { query, skillIds, limit, sortBy, dateRange } = input;
-    const options = { limit: Math.min(limit, 50), sortBy: sortBy ?? 'relevance', dateRange };
+    const { query, skillIds, limit, sortBy, dateRange, absoluteDateWindow } = input;
+    
+    // Pass both legacy dateRange AND new absoluteDateWindow to skills
+    // Skills should prefer absoluteDateWindow when available for precise filtering
+    const options = { 
+      limit: Math.min(limit, 50), 
+      sortBy: sortBy ?? 'relevance', 
+      dateRange,
+      absoluteDateWindow, // New: enables query-time date filtering with strict mode
+    };
     const sourcesQueried: string[] = [];
     const sourcesSkipped: string[] = [];
     const exclusionReasons: string[] = [];

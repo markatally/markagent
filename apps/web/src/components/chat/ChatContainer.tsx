@@ -40,6 +40,14 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
   const startTableBlock = useChatStore((state) => state.startTableBlock);
   const completeTableBlock = useChatStore((state) => state.completeTableBlock);
   const clearTables = useChatStore((state) => state.clearTables);
+  const clearToolCalls = useChatStore((state) => state.clearToolCalls);
+
+  // Clear tool calls, tables, and files when session changes
+  useEffect(() => {
+    clearToolCalls();
+    clearTables();
+    setFiles([]);
+  }, [sessionId, clearToolCalls, clearTables]);
 
   // Scroll to bottom helper
   const scrollToBottom = () => {

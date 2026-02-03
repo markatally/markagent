@@ -1,9 +1,13 @@
 /**
  * SemanticScholarSkill - Semantic Scholar API for paper search and metadata
  * Returns structured data only: citation count, year/venue, abstract.
+ * 
+ * TIME-RANGE ENFORCEMENT:
+ * - Supports AbsoluteDateWindow for query-time filtering via year parameter
+ * - Note: S2 API only supports year-level filtering, not month/day
  */
 
-import type { PaperSearchSkill, RawPaperResult, PaperSearchSkillOptions } from './types';
+import type { PaperSearchSkill, RawPaperResult, PaperSearchSkillOptions, AbsoluteDateWindow } from './types';
 
 const BASE_URL = 'https://api.semanticscholar.org/graph/v1/paper/search';
 const PAPER_URL = 'https://api.semanticscholar.org/graph/v1/paper';
@@ -17,12 +21,23 @@ export const SemanticScholarSkill: PaperSearchSkill = {
   description: 'Search papers via Semantic Scholar API. Returns citation count, venue, and publication year.',
 
   async search(query: string, options: PaperSearchSkillOptions): Promise<RawPaperResult[]> {
-    const { limit, sortBy } = options;
+    const { limit, sortBy, absoluteDateWindow } = options;
     const params = new URLSearchParams({
       query,
       limit: String(Math.min(limit, 100)),
       fields: FIELDS,
     });
+    
+    // Apply date filtering via year range (S2 API supports year-level filtering)
+    // WHY: This filters at query time, reducing irrelevant results before post-filtering
+    if (absoluteDateWindow) {
+      const startYear = new Date(absoluteDateWindow.startDate).getFullYear();
+      const endYear = new Date(absoluteDateWindow.endDate).getFullYear();
+      // Semantic Scholar uses year parameter for filtering
+      params.set('year', `${startYear}-${endYear}`);
+      console.log(`[SemanticScholarSkill] Using year filter: ${startYear}-${endYear} (strict=${absoluteDateWindow.strict})`);
+    }
+    
     if (sortBy === 'date') {
       params.set('sort', 'year');
       params.set('sortOrder', 'desc');

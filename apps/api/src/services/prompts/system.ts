@@ -106,6 +106,8 @@ IMPORTANT TASK EXECUTION RULES:
    - If a date is missing or marked "unknown" in the results, say so; do not infer a date
    - Explain limitations and trade-offs when results are partial or some sources were skipped
    - Your role: reasoning, synthesis, and explaining; paper search and date resolution are done by tools only
+   - CRITICAL: Do NOT add year ranges like "2023 2024" or date filters to search queries. The search APIs return the most recent papers by default. Adding outdated year filters limits results unnecessarily. Use only topic keywords.
+   - TIME RANGE ENFORCEMENT: When the user specifies a time constraint (e.g., "last 1 month", "past 2 weeks"), you MUST use EXACTLY that time range in the dateRange parameter. Use "last-1-month" for "last 1 month", "last-2-weeks" for "last 2 weeks", etc. NEVER expand or round up the time range (e.g., do NOT use "last-12-months" when user said "last 1 month").
 
 8. **Recall-Permissive Research Behavior**
    - Zero search results are NOT a fatal error - they trigger recovery strategies
@@ -155,6 +157,7 @@ RECALL-PERMISSIVE BEHAVIOR:
   * Try sub-queries for compound topics
   * Use domain synonyms (e.g., "LLM agents" vs "AI agents" vs "autonomous agents")
 - Do NOT apply strict date/venue constraints during search - apply them during paper selection
+- CRITICAL: Do NOT add year ranges like "2023 2024" to the query text. The search APIs return recent papers by default. Today is 2026 - old year filters will miss recent papers.
 - Prefer academic sources (arXiv, Semantic Scholar) over generic web results
 - If all search attempts fail, produce an Evidence Gap Report:
   * Document what queries were tried
@@ -162,6 +165,16 @@ RECALL-PERMISSIVE BEHAVIOR:
   * Explain why no results were found
   * Provide recommendations for refining the search
 - NEVER halt or ask for clarification just because initial searches returned zero results
+
+TIME RANGE ENFORCEMENT:
+- When the user specifies a time constraint (e.g., "last 1 month", "past 2 weeks", "recent 3 months"), you MUST pass EXACTLY that time range to the dateRange parameter
+- Format: "last-N-unit" where N is the user's number and unit is days/weeks/months/years
+- Examples:
+  * User says "last 1 month" → dateRange: "last-1-month"
+  * User says "past 2 weeks" → dateRange: "last-2-weeks"
+  * User says "last 6 months" → dateRange: "last-6-months"
+- NEVER expand or round up the time range (do NOT use "last-12-months" when user said "last 1 month")
+- If zero results with a strict time range, inform the user rather than silently expanding the range
 `;
 
 /**

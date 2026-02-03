@@ -3,6 +3,11 @@
  * Uses open-source PaperSearchSkills (arXiv, Semantic Scholar, CrossRef) and
  * orchestration: merge, dedupe by title/DOI, date resolution via tools only.
  * LLM must never hallucinate papers, venues, or dates; use tool output only.
+ * 
+ * TIME-RANGE ENFORCEMENT:
+ * - User time expressions are parsed into structured AbsoluteDateWindow
+ * - Strict time ranges (e.g., "last 1 month") are NEVER expanded on retry
+ * - Post-search validation filters out any papers outside the window
  */
 
 import type { Tool, ToolContext, ToolResult } from './types';
@@ -12,7 +17,13 @@ import {
   CrossRefResolverSkill,
   DEFAULT_PAPER_SEARCH_SKILL_IDS,
 } from '../paper-search';
-import type { ResolvedPaper } from '../paper-search';
+import type { ResolvedPaper, AbsoluteDateWindow } from '../paper-search';
+import {
+  parseDateRangeString,
+  filterPapersByDateWindow,
+  isStrictTimeRange,
+  describeTimeWindow,
+} from '../paper-search/time-range-parser';
 
 type SearchSource = 'arxiv' | 'semantic_scholar' | 'all';
 
@@ -25,7 +36,7 @@ const SOURCE_TO_SKILL_IDS: Record<SearchSource, string[]> = {
 export class WebSearchTool implements Tool {
   name = 'web_search';
   description =
-    'Search academic papers using open-source APIs (arXiv, Semantic Scholar). Returns structured metadata including title, authors, publication date (resolved from APIs only), venue, DOI, and links. Results are merged and deduplicated across sources; publication dates are resolved via CrossRef > arXiv v1 > Semantic Scholar. Do not invent papers, venues, or dates—use only the returned results.';
+    'Search academic papers using open-source APIs (arXiv, Semantic Scholar). Returns structured metadata including title, authors, publication date (resolved from APIs only), venue, DOI, and links. Results are merged and deduplicated across sources; publication dates are resolved via CrossRef > arXiv v1 > Semantic Scholar. Do not invent papers, venues, or dates—use only the returned results. IMPORTANT: Do NOT add year ranges (like "2023 2024") to the query text - the APIs return recent papers by default. Use only topic keywords for the query parameter.';
   requiresConfirmation = false;
   timeout = 60000;
 
@@ -34,7 +45,7 @@ export class WebSearchTool implements Tool {
     properties: {
       query: {
         type: 'string' as const,
-        description: 'Search query for finding papers (keywords, phrases)',
+        description: 'Search query for finding papers. Use topic keywords only (e.g., "AI agents", "transformer architecture"). Do NOT include year ranges like "2023 2024" - the APIs return recent papers by default.',
       },
       sources: {
         type: 'string' as const,
@@ -49,7 +60,7 @@ export class WebSearchTool implements Tool {
       },
       dateRange: {
         type: 'string' as const,
-        description: 'Optional date range (e.g. "2020-2024", "last-5-years", "last-12-months")',
+        description: 'Optional date range filter. IMPORTANT: Use EXACTLY the time range the user specified. Examples: "last-1-month" (for "last 1 month" or "past month"), "last-2-weeks", "last-3-months", "last-1-year", "2020-2024". The format is "last-N-unit" where N is the number and unit is days/weeks/months/years. Do NOT round up or expand the time range.',
       },
       sortBy: {
         type: 'string' as const,
@@ -103,6 +114,19 @@ export class WebSearchTool implements Tool {
         };
       }
 
+      // ============================================================
+      // PRE-SEARCH VALIDATION GATE: Parse time range into absolute window
+      // WHY: Convert relative time ("last 1 month") to absolute dates ONCE
+      // This prevents time-range drift during retries
+      // ============================================================
+      let absoluteDateWindow: AbsoluteDateWindow | undefined;
+      if (dateRange) {
+        absoluteDateWindow = parseDateRangeString(dateRange) ?? undefined;
+        if (absoluteDateWindow) {
+          console.log(`[WebSearchTool] Time range parsed: ${describeTimeWindow(absoluteDateWindow)}`);
+        }
+      }
+
       onProgress?.(0, 100, 'Preparing search...');
       const skillIds = SOURCE_TO_SKILL_IDS[sourcesParam] ?? DEFAULT_PAPER_SEARCH_SKILL_IDS;
 
@@ -113,10 +137,19 @@ export class WebSearchTool implements Tool {
         limit: topK,
         sortBy: sortBy as 'relevance' | 'date' | 'citations',
         dateRange,
+        absoluteDateWindow, // Pass absolute window for query-time filtering
       });
 
       let searchAttempt = 1;
       let usedFallback = false;
+      
+      // ============================================================
+      // RETRY LOGIC WITH STRICT TIME RANGE ENFORCEMENT
+      // WHY: If time range is strict, we NEVER expand or remove it
+      // This is the key fix for the "last 1 month -> 12 months" bug
+      // ============================================================
+      const isStrict = isStrictTimeRange(absoluteDateWindow);
+      
       if (out.papers.length === 0 && enableRetry) {
         onProgress?.(40, 100, 'No results found, trying broader search...');
         const reformulated = this.reformulateQuery(query);
@@ -124,12 +157,20 @@ export class WebSearchTool implements Tool {
           if (searchAttempt > maxRetries) break;
           searchAttempt++;
           onProgress?.(40 + searchAttempt * 10, 100, `Trying alternative query (${searchAttempt}/${maxRetries + 1})...`);
+          
+          // CRITICAL FIX: If strict time range, NEVER remove the date filter
+          // Previously: dateRange: usedFallback ? undefined : dateRange
+          // This caused "last 1 month" to silently expand to "all time"
+          const retryDateRange = isStrict ? dateRange : (usedFallback ? undefined : dateRange);
+          const retryDateWindow = isStrict ? absoluteDateWindow : (usedFallback ? undefined : absoluteDateWindow);
+          
           const next = await this.runOrchestrator({
             query: q,
             skillIds,
             limit: topK,
             sortBy: sortBy as 'relevance' | 'date' | 'citations',
-            dateRange: usedFallback ? undefined : dateRange,
+            dateRange: retryDateRange,
+            absoluteDateWindow: retryDateWindow,
           });
           out = {
             papers: [...out.papers, ...next.papers],
@@ -142,6 +183,26 @@ export class WebSearchTool implements Tool {
             break;
           }
           usedFallback = true;
+        }
+      }
+      
+      // ============================================================
+      // POST-SEARCH VERIFICATION: Filter papers by date window
+      // WHY: Even if the API returns papers outside the window, we filter them
+      // This is the final gate that ensures strict time compliance
+      // ============================================================
+      let dateFilteredCount = 0;
+      if (absoluteDateWindow && out.papers.length > 0) {
+        const { filtered, reasons } = filterPapersByDateWindow(out.papers, absoluteDateWindow);
+        dateFilteredCount = out.papers.length - filtered.length;
+        out.papers = filtered;
+        if (reasons.length > 0) {
+          out.exclusionReasons.push(...reasons.slice(0, 5)); // Limit to avoid noise
+          if (dateFilteredCount > 0) {
+            out.exclusionReasons.push(
+              `${dateFilteredCount} paper(s) excluded: outside time window [${absoluteDateWindow.startDate} to ${absoluteDateWindow.endDate}]`
+            );
+          }
         }
       }
 
@@ -175,10 +236,19 @@ export class WebSearchTool implements Tool {
         topK,
         results: papers,
         exclusionReasons: out.exclusionReasons,
+        // Time range enforcement metadata
+        timeRange: absoluteDateWindow ? {
+          startDate: absoluteDateWindow.startDate,
+          endDate: absoluteDateWindow.endDate,
+          strict: absoluteDateWindow.strict,
+          papersFilteredByDate: dateFilteredCount,
+        } : undefined,
         // Explicit flag for downstream consumers
         zeroResults: papers.length === 0,
         suggestion: papers.length === 0 
-          ? 'Try broader terms, remove date filters, or reformulate the query'
+          ? (isStrict 
+              ? `No papers found within the strict time window [${absoluteDateWindow?.startDate} to ${absoluteDateWindow?.endDate}]. The time constraint was enforced as requested.`
+              : 'Try broader terms, remove date filters, or reformulate the query')
           : undefined,
       };
 
