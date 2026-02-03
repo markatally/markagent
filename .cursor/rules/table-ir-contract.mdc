@@ -1,0 +1,46 @@
+---
+description: Schema-first Table IR contract for all LLM-generated tabular data
+alwaysApply: true
+---
+
+# Table IR Contract
+
+When outputting tabular data (analysis, research, reports, etc.), use a structured
+schema-driven representation. This applies to all table-like outputs regardless of
+downstream renderer or execution mode.
+
+## Format
+
+```json
+{
+  "schema": {
+    "columns": [
+      { "key": "id", "label": "ID", "dataType": "number", "sortable": true, "filterable": false }
+    ]
+  },
+  "data": [
+    { "id": 1 }
+  ]
+}
+```
+
+## Column Schema (required fields)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `key` | string | Unique field identifier |
+| `label` | string | Human-readable column name |
+| `dataType` | string | Semantic type (see below) |
+| `sortable` | boolean | Whether renderer may enable sorting |
+| `filterable` | boolean | Whether renderer may enable filtering |
+
+## Supported dataType values
+
+`number`, `string`, `text`, `date`, `datetime`, `boolean`, `url`, `enum`, `array`, `object`, `json`
+
+## Rules
+
+1. **Schema-first**: Separate column definitions from row data
+2. **No pre-processing**: Return data in original order (unsorted, unfiltered)
+3. **Complete data**: Include all rows; pagination is renderer responsibility
+4. **Declarative**: All sorting, filtering, pagination handled outside the LLM

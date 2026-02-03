@@ -214,6 +214,185 @@ export interface LogEntry {
   metadata?: Record<string, any>;
 }
 
+// ============ Table Types ============
+
+/**
+ * Cell value in a table - supports text, numbers, and booleans
+ */
+export type TableCellValue = string | number | boolean | null;
+
+/**
+ * Column definition for a table schema
+ * @deprecated Use TableIRColumn for new Table IR implementations
+ */
+export interface TableColumn {
+  /** Column identifier (used internally) */
+  id: string;
+  /** Display header text */
+  header: string;
+  /** Text alignment for the column */
+  align?: 'left' | 'center' | 'right';
+  /** Minimum width hint (optional) */
+  minWidth?: number;
+}
+
+/**
+ * Table schema defining the structure
+ * @deprecated Use TableIRSchema for new Table IR implementations
+ */
+export interface TableSchema {
+  /** Ordered list of column definitions */
+  columns: TableColumn[];
+}
+
+/**
+ * A single row of data matching the schema
+ * @deprecated Use TableIRRow for new Table IR implementations
+ */
+export type TableRow = TableCellValue[];
+
+/**
+ * Complete table data structure
+ * LLMs output this structured format; the renderer converts to Markdown
+ * @deprecated Use TableIR for new Table IR implementations
+ */
+export interface TableData {
+  /** Table schema with column definitions */
+  schema: TableSchema;
+  /** Array of rows, each row must have exactly schema.columns.length cells */
+  rows: TableRow[];
+  /** Optional table caption/title */
+  caption?: string;
+}
+
+// ============ Table IR Types (Schema-First Contract) ============
+// These types implement the Table IR contract defined in .cursor/rules/table-ir-contract.mdc
+// All tabular data from the LLM should use this format for interactive rendering.
+
+/**
+ * Supported data types for Table IR columns.
+ * Determines sorting behavior and potential UI treatment.
+ */
+export type TableIRDataType =
+  | 'number'
+  | 'string'
+  | 'text'
+  | 'date'
+  | 'datetime'
+  | 'boolean'
+  | 'url'
+  | 'enum'
+  | 'array'
+  | 'object'
+  | 'json';
+
+/**
+ * Column definition for Table IR schema.
+ * Implements the schema-first contract for interactive tables.
+ */
+export interface TableIRColumn {
+  /** Unique field identifier (used as key in row data) */
+  key: string;
+  /** Human-readable column name */
+  label: string;
+  /** Semantic type of the column (determines sorting behavior) */
+  dataType: TableIRDataType;
+  /** Whether the renderer may enable sorting for this column */
+  sortable: boolean;
+  /** Whether the renderer may enable filtering for this column */
+  filterable: boolean;
+}
+
+/**
+ * Table IR schema defining the column structure.
+ */
+export interface TableIRSchema {
+  /** Ordered list of column definitions */
+  columns: TableIRColumn[];
+}
+
+/**
+ * A single row of data as a key-value object.
+ * Keys must match column `key` values in the schema.
+ */
+export type TableIRRow = Record<string, TableCellValue>;
+
+/**
+ * Complete Table IR data structure.
+ * Implements the schema-first contract: schema + data separation,
+ * with all sorting/filtering/pagination delegated to the renderer.
+ *
+ * @see .cursor/rules/table-ir-contract.mdc
+ */
+export interface TableIR {
+  /** Table schema with column definitions */
+  schema: TableIRSchema;
+  /** Array of row objects (keys match schema column keys) */
+  data: TableIRRow[];
+  /** Optional table caption/title */
+  caption?: string;
+}
+
+// ============ Content Block Types ============
+// Structured content blocks allow messages to contain mixed content types
+// (text, tables, code, etc.) instead of just plain strings.
+
+/**
+ * Text content block - plain markdown text
+ */
+export interface TextContentBlock {
+  type: 'text';
+  content: string;
+}
+
+/**
+ * Table content block - structured Table IR data
+ */
+export interface TableContentBlock {
+  type: 'table';
+  /** Unique identifier for this table block */
+  id: string;
+  /** The Table IR data */
+  table: TableIR;
+  /** Whether the table is still being streamed (incomplete) */
+  isStreaming?: boolean;
+}
+
+/**
+ * Union type for all content block types
+ */
+export type ContentBlock = TextContentBlock | TableContentBlock;
+
+/**
+ * Extended message content that can be either a simple string
+ * or an array of structured content blocks.
+ */
+export type MessageContent = string | ContentBlock[];
+
+/**
+ * Result of table validation
+ */
+export interface TableValidationResult {
+  /** Whether the table is valid */
+  valid: boolean;
+  /** Error messages if invalid */
+  errors: string[];
+  /** Warnings (valid but potentially problematic) */
+  warnings: string[];
+}
+
+/**
+ * Options for table rendering
+ */
+export interface TableRenderOptions {
+  /** Output format (currently only markdown supported) */
+  format?: 'markdown';
+  /** Include caption above table */
+  includeCaption?: boolean;
+  /** Escape pipe characters in cell content */
+  escapePipes?: boolean;
+}
+
 // ============ API Response Types ============
 
 export interface ChatResponse {
@@ -285,6 +464,8 @@ export type StreamEventType =
   | 'file.created'
   | 'file.modified'
   | 'file.deleted'
+  | 'table.start'
+  | 'table.complete'
   | 'error'
   | 'session.end';
 
@@ -293,4 +474,26 @@ export interface StreamEvent {
   sessionId: string;
   timestamp: number;
   data: any;
+}
+
+/**
+ * Data payload for table.start event
+ */
+export interface TableStartEventData {
+  /** Unique identifier for this table block */
+  tableId: string;
+  /** The Table IR schema (columns are known upfront) */
+  schema: TableIRSchema;
+  /** Optional caption */
+  caption?: string;
+}
+
+/**
+ * Data payload for table.complete event
+ */
+export interface TableCompleteEventData {
+  /** Unique identifier for this table block */
+  tableId: string;
+  /** Complete Table IR data */
+  table: TableIR;
 }

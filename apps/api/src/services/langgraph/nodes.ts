@@ -15,10 +15,78 @@ import type {
   ExecutionStep,
   AgentError,
   ConditionResult,
+  RecallAttempt,
 } from './types';
 import type { SkillRegistry, SkillContext } from './skills';
 import type { ToolRegistry } from '../tools/registry';
 import type { LLMClient } from '../llm';
+
+// ============================================================
+// QUERY REFORMULATION UTILITIES
+// ============================================================
+
+/**
+ * Generates simplified/reformulated queries from the original query
+ * Strategy: Remove adjectives, split compound queries, use synonyms
+ */
+function generateReformulatedQueries(originalQuery: string): string[] {
+  const queries: string[] = [];
+  
+  // Strategy 1: Remove common adjectives and qualifiers
+  const adjectives = ['advanced', 'novel', 'state-of-the-art', 'modern', 'recent', 'new', 'emerging', 'cutting-edge', 'comprehensive', 'systematic'];
+  let simplified = originalQuery;
+  for (const adj of adjectives) {
+    simplified = simplified.replace(new RegExp(`\\b${adj}\\b`, 'gi'), '').trim();
+  }
+  if (simplified !== originalQuery && simplified.length > 3) {
+    queries.push(simplified.replace(/\s+/g, ' ').trim());
+  }
+  
+  // Strategy 2: Extract key noun phrases (split on common connectors)
+  const parts = originalQuery.split(/\s+(?:and|or|for|in|with|using|about)\s+/i);
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (trimmed.length >= 3 && trimmed !== originalQuery) {
+      queries.push(trimmed);
+    }
+  }
+  
+  // Strategy 3: Use core terms only (remove stopwords more aggressively)
+  const stopwords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'this', 'that', 'these', 'those', 'i', 'we', 'you', 'they', 'it', 'about', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'just', 'now']);
+  const coreTerms = originalQuery
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !stopwords.has(word))
+    .slice(0, 5)
+    .join(' ');
+  if (coreTerms.length >= 3 && coreTerms !== originalQuery.toLowerCase()) {
+    queries.push(coreTerms);
+  }
+  
+  // Strategy 4: Common research topic reformulations
+  const domainAliases: Record<string, string[]> = {
+    'ai agents': ['LLM agents', 'autonomous agents', 'intelligent agents'],
+    'llm': ['large language model', 'language model', 'GPT'],
+    'multi-agent': ['multiagent', 'multi agent', 'collaborative agents'],
+    'reinforcement learning': ['RL', 'reward learning', 'policy learning'],
+    'autonomous systems': ['autonomous agents', 'self-driving', 'robotic systems'],
+  };
+  
+  for (const [term, aliases] of Object.entries(domainAliases)) {
+    if (originalQuery.toLowerCase().includes(term)) {
+      for (const alias of aliases) {
+        const reformulated = originalQuery.toLowerCase().replace(term, alias);
+        if (reformulated !== originalQuery.toLowerCase()) {
+          queries.push(reformulated);
+        }
+      }
+    }
+  }
+  
+  // Deduplicate and limit
+  const unique = [...new Set(queries.map(q => q.toLowerCase().trim()))];
+  return unique.slice(0, 6);
+}
 
 // ============================================================
 // NODE INTERFACES
@@ -291,11 +359,17 @@ Extract relevant entities like topic, keywords, file paths, etc.`;
 /**
  * Paper Discovery Node
  * MANDATORY tool usage - uses web_search to find papers
+ * 
+ * RECALL-PERMISSIVE DESIGN:
+ * - Zero results NEVER cause fatal errors
+ * - Implements multi-attempt recall with query reformulation
+ * - Tracks all attempts for downstream recovery nodes
+ * - Constraints (year, venue) applied ONLY during verification, not search
  */
 export const PaperDiscoveryNode: GraphNode<ResearchState, void, any> = {
   id: 'paper_discovery',
   name: 'Paper Discovery',
-  description: 'Discover academic papers using search tools (MANDATORY tool usage)',
+  description: 'Discover academic papers using search tools with multi-attempt recall',
   
   preconditions: [
     {
@@ -306,12 +380,13 @@ export const PaperDiscoveryNode: GraphNode<ResearchState, void, any> = {
     },
   ],
   
+  // CRITICAL: No fatal postconditions - zero results trigger recovery, not failure
   postconditions: [
     {
-      name: 'has_papers',
-      check: (_state, output) => output.papers && output.papers.length > 0,
-      errorMessage: 'No papers found for the given query',
-      severity: 'error',
+      name: 'tracking_complete',
+      check: (_state, output) => output.recallAttempts && output.recallAttempts.length > 0,
+      errorMessage: 'Recall attempts must be tracked',
+      severity: 'warning',
     },
   ],
   
@@ -324,24 +399,125 @@ export const PaperDiscoveryNode: GraphNode<ResearchState, void, any> = {
       startTime: Date.now(),
     };
     
-    const result = await context.skills.execute(
-      'paper_discovery',
-      {
-        query: state.searchQuery,
-        sources: state.searchSources || ['arxiv', 'semantic_scholar'],
-        maxResults: 20,
-      },
-      skillContext
-    );
+    const maxAttempts = state.maxRecallAttempts || 5;
+    const recallAttempts: RecallAttempt[] = [...(state.recallAttempts || [])];
+    const queriesAttempted = new Set<string>(state.queriesAttempted || []);
+    const allPapers: any[] = [...(state.discoveredPapers || [])];
+    const sources = state.searchSources || ['arxiv', 'semantic_scholar'];
     
-    if (!result.success) {
-      throw new Error(result.error || 'Paper discovery failed');
+    // Generate queries to try
+    const queriesToTry: Array<{ query: string; strategy: RecallAttempt['strategy'] }> = [];
+    
+    // Start with original query if not tried
+    if (!queriesAttempted.has(state.searchQuery!.toLowerCase())) {
+      queriesToTry.push({ query: state.searchQuery!, strategy: 'original' });
     }
     
-    return result.output;
+    // Add reformulated queries
+    const reformulated = generateReformulatedQueries(state.searchQuery!);
+    for (const q of reformulated) {
+      if (!queriesAttempted.has(q.toLowerCase())) {
+        queriesToTry.push({ query: q, strategy: 'simplified' });
+      }
+    }
+    
+    // Execute search attempts (up to maxAttempts)
+    let attemptNumber = recallAttempts.length;
+    
+    for (const { query, strategy } of queriesToTry) {
+      if (attemptNumber >= maxAttempts) {
+        console.log(`[PaperDiscovery] Max recall attempts (${maxAttempts}) reached`);
+        break;
+      }
+      
+      if (queriesAttempted.has(query.toLowerCase())) {
+        continue;
+      }
+      
+      attemptNumber++;
+      queriesAttempted.add(query.toLowerCase());
+      
+      console.log(`[PaperDiscovery] Attempt ${attemptNumber}/${maxAttempts}: "${query}" (${strategy})`);
+      
+      try {
+        const result = await context.skills.execute(
+          'paper_discovery',
+          {
+            query,
+            sources,
+            maxResults: 20,
+            // CRITICAL: Do NOT apply date constraints at search time
+            // Constraints are applied during verification only
+          },
+          skillContext
+        );
+        
+        const output = result.output as { papers?: any[] } | undefined;
+        const papersFound = result.success && output?.papers?.length 
+          ? output.papers 
+          : [];
+        
+        recallAttempts.push({
+          attemptNumber,
+          query,
+          sources,
+          resultsFound: papersFound.length,
+          timestamp: new Date(),
+          strategy,
+        });
+        
+        if (papersFound.length > 0) {
+          // Deduplicate by title
+          const existingTitles = new Set(allPapers.map((p: any) => p.title?.toLowerCase()));
+          for (const paper of papersFound) {
+            if (!existingTitles.has(paper.title?.toLowerCase())) {
+              allPapers.push(paper);
+              existingTitles.add(paper.title?.toLowerCase());
+            }
+          }
+          
+          console.log(`[PaperDiscovery] Found ${papersFound.length} papers, total: ${allPapers.length}`);
+          
+          // If we have enough papers, we can stop early
+          if (allPapers.length >= 10) {
+            console.log(`[PaperDiscovery] Sufficient papers found, stopping recall`);
+            break;
+          }
+        }
+      } catch (error) {
+        console.error(`[PaperDiscovery] Attempt ${attemptNumber} failed:`, error);
+        
+        recallAttempts.push({
+          attemptNumber,
+          query,
+          sources,
+          resultsFound: 0,
+          timestamp: new Date(),
+          strategy,
+        });
+      }
+    }
+    
+    // Determine if recall is exhausted
+    const recallExhausted = attemptNumber >= maxAttempts || 
+      (queriesToTry.length === 0 && allPapers.length === 0);
+    
+    return {
+      papers: allPapers,
+      recallAttempts,
+      queriesAttempted: Array.from(queriesAttempted),
+      recallExhausted,
+      metadata: {
+        totalFound: allPapers.length,
+        sourcesSearched: sources,
+        searchDuration: Date.now() - skillContext.startTime,
+        attemptsUsed: attemptNumber,
+      },
+    };
   },
   
   updateState(state, output) {
+    // Filter valid papers (must have title and meaningful abstract)
     const validPapers = output.papers.filter((p: any) => 
       p.title && p.abstract && p.abstract.length > 50
     );
@@ -351,6 +527,9 @@ export const PaperDiscoveryNode: GraphNode<ResearchState, void, any> = {
       discoveredPapers: output.papers,
       validPapers,
       discoveryMetadata: output.metadata,
+      recallAttempts: output.recallAttempts,
+      queriesAttempted: output.queriesAttempted,
+      recallExhausted: output.recallExhausted,
       currentNode: 'paper_discovery',
     };
   },
@@ -358,12 +537,15 @@ export const PaperDiscoveryNode: GraphNode<ResearchState, void, any> = {
 
 /**
  * Discovery Validation Node
- * HARD CONSTRAINT: Must have at least 3 valid papers
+ * 
+ * VERIFICATION CONSTRAINT: Requires minimum papers for synthesis
+ * NOTE: Insufficient papers triggers RECOVERY, not failure
+ * The graph's conditional edge handles routing to RecallRecoveryNode or HaltNode
  */
 export const DiscoveryValidationNode: GraphNode<ResearchState, void, { passed: boolean; paperCount: number }> = {
   id: 'discovery_validation',
   name: 'Discovery Validation',
-  description: 'Validate that enough papers were discovered (minimum 3)',
+  description: 'Validate paper count and determine next step (continue, recover, or halt)',
   
   preconditions: [],
   
@@ -372,29 +554,61 @@ export const DiscoveryValidationNode: GraphNode<ResearchState, void, { passed: b
   async execute(state, _input, _context) {
     const MIN_REQUIRED = 3;
     const paperCount = state.validPapers.length;
+    const recallExhausted = state.recallExhausted === true;
+    const attemptCount = state.recallAttempts?.length || 0;
+    
+    console.log(`[DiscoveryValidation] Papers: ${paperCount}, Recall exhausted: ${recallExhausted}, Attempts: ${attemptCount}`);
     
     return {
       passed: paperCount >= MIN_REQUIRED,
       paperCount,
       requiredCount: MIN_REQUIRED,
+      recallExhausted,
+      attemptCount,
       message: paperCount >= MIN_REQUIRED
         ? `Found ${paperCount} valid papers, proceeding to summarization`
-        : `Only ${paperCount} valid papers found, minimum ${MIN_REQUIRED} required`,
+        : recallExhausted
+          ? `Only ${paperCount} valid papers found after ${attemptCount} attempts. Generating Evidence Gap Report.`
+          : `Only ${paperCount} valid papers found, attempting recovery strategies`,
     };
   },
   
   updateState(state, output) {
-    if (!output.passed) {
+    // NOTE: We do NOT set status to 'failed' here anymore
+    // The graph routing handles whether to:
+    // 1. Continue to synthesis (enough papers)
+    // 2. Try recovery (insufficient but not exhausted)
+    // 3. Go to halt node (exhausted, will produce Evidence Gap Report)
+    
+    if (!output.passed && !state.recallExhausted) {
+      // Will be routed to recovery - add warning, not error
       return {
         ...state,
-        status: 'failed',
-        errors: [
-          ...state.errors,
+        warnings: [
+          ...state.warnings,
           {
-            code: 'INSUFFICIENT_PAPERS',
-            message: `Only ${output.paperCount} valid papers found, minimum 3 required`,
+            code: 'INSUFFICIENT_PAPERS_RECOVERING',
+            message: `Only ${output.paperCount} valid papers found, attempting recovery`,
             nodeId: 'discovery_validation',
-            severity: 'fatal',
+            severity: 'warning',
+            timestamp: new Date(),
+          },
+        ],
+        currentNode: 'discovery_validation',
+      };
+    }
+    
+    if (!output.passed && state.recallExhausted) {
+      // Will be routed to halt node - add informational note
+      return {
+        ...state,
+        warnings: [
+          ...state.warnings,
+          {
+            code: 'RECALL_EXHAUSTED',
+            message: `Recall strategies exhausted with ${output.paperCount} papers. Evidence Gap Report will be generated.`,
+            nodeId: 'discovery_validation',
+            severity: 'warning',
             timestamp: new Date(),
           },
         ],
@@ -719,13 +933,391 @@ IMPORTANT:
 };
 
 /**
+ * Recall Recovery Node
+ * Triggered when initial discovery yields insufficient papers
+ * Implements additional recovery strategies:
+ * - Academic skills directly (ArxivSearchSkill, SemanticScholarSkill)
+ * - Broader query variations
+ * - Relaxed constraints
+ * 
+ * DESIGN PRINCIPLE: Recall permissive, verification strict
+ */
+export const RecallRecoveryNode: GraphNode<ResearchState, void, any> = {
+  id: 'recall_recovery',
+  name: 'Recall Recovery',
+  description: 'Additional recall strategies when initial discovery is insufficient',
+  
+  preconditions: [
+    {
+      name: 'has_initial_attempt',
+      check: (state) => state.recallAttempts && state.recallAttempts.length > 0,
+      errorMessage: 'Must have attempted initial discovery',
+      severity: 'error',
+    },
+  ],
+  
+  postconditions: [],
+  
+  async execute(state, _input, context) {
+    const skillContext: SkillContext = {
+      sessionId: context.sessionId,
+      userId: context.userId,
+      tools: context.tools,
+      llm: context.llm,
+      startTime: Date.now(),
+    };
+    
+    const maxAttempts = state.maxRecallAttempts || 5;
+    const recallAttempts: RecallAttempt[] = [...(state.recallAttempts || [])];
+    const queriesAttempted = new Set<string>(state.queriesAttempted || []);
+    const allPapers: any[] = [...(state.discoveredPapers || [])];
+    const currentAttempts = recallAttempts.length;
+    
+    // If already exhausted, skip
+    if (state.recallExhausted || currentAttempts >= maxAttempts) {
+      console.log('[RecallRecovery] Recall already exhausted');
+      return {
+        papers: allPapers,
+        recallAttempts,
+        queriesAttempted: Array.from(queriesAttempted),
+        recallExhausted: true,
+      };
+    }
+    
+    console.log(`[RecallRecovery] Starting recovery with ${allPapers.length} papers found so far`);
+    
+    // Recovery Strategy 1: Use broadened domain-specific queries
+    const broadQueries = [
+      'machine learning agents',
+      'neural network agents',
+      'artificial intelligence autonomous',
+      'deep learning robotics',
+      'reinforcement learning applications',
+    ];
+    
+    let attemptNumber = currentAttempts;
+    
+    for (const query of broadQueries) {
+      if (attemptNumber >= maxAttempts) break;
+      if (queriesAttempted.has(query.toLowerCase())) continue;
+      if (allPapers.length >= 10) break; // Sufficient papers
+      
+      attemptNumber++;
+      queriesAttempted.add(query.toLowerCase());
+      
+      console.log(`[RecallRecovery] Attempt ${attemptNumber}: broadened query "${query}"`);
+      
+      try {
+        const result = await context.skills.execute(
+          'paper_discovery',
+          {
+            query,
+            sources: ['arxiv', 'semantic_scholar'],
+            maxResults: 15,
+          },
+          skillContext
+        );
+        
+        const output = result.output as { papers?: any[] } | undefined;
+        const papersFound = result.success && output?.papers?.length 
+          ? output.papers 
+          : [];
+        
+        recallAttempts.push({
+          attemptNumber,
+          query,
+          sources: ['arxiv', 'semantic_scholar'],
+          resultsFound: papersFound.length,
+          timestamp: new Date(),
+          strategy: 'broadened',
+        });
+        
+        if (papersFound.length > 0) {
+          const existingTitles = new Set(allPapers.map((p: any) => p.title?.toLowerCase()));
+          for (const paper of papersFound) {
+            if (!existingTitles.has(paper.title?.toLowerCase())) {
+              allPapers.push(paper);
+              existingTitles.add(paper.title?.toLowerCase());
+            }
+          }
+          console.log(`[RecallRecovery] Found ${papersFound.length} papers, total: ${allPapers.length}`);
+        }
+      } catch (error) {
+        console.error(`[RecallRecovery] Attempt ${attemptNumber} failed:`, error);
+        recallAttempts.push({
+          attemptNumber,
+          query,
+          sources: ['arxiv', 'semantic_scholar'],
+          resultsFound: 0,
+          timestamp: new Date(),
+          strategy: 'broadened',
+        });
+      }
+    }
+    
+    // Recovery Strategy 2: Direct academic skill calls (if still insufficient)
+    if (allPapers.length < 5 && attemptNumber < maxAttempts) {
+      const coreTerms = (state.searchQuery || '')
+        .split(/\s+/)
+        .filter(w => w.length > 3)
+        .slice(0, 3)
+        .join(' ');
+      
+      if (coreTerms && !queriesAttempted.has(coreTerms.toLowerCase())) {
+        attemptNumber++;
+        queriesAttempted.add(coreTerms.toLowerCase());
+        
+        console.log(`[RecallRecovery] Attempt ${attemptNumber}: core terms "${coreTerms}"`);
+        
+        try {
+          const result = await context.skills.execute(
+            'paper_discovery',
+            {
+              query: coreTerms,
+              sources: ['arxiv', 'semantic_scholar'],
+              maxResults: 20,
+            },
+            skillContext
+          );
+          
+          const output = result.output as { papers?: any[] } | undefined;
+          const papersFound = result.success && output?.papers?.length 
+            ? output.papers 
+            : [];
+          
+          recallAttempts.push({
+            attemptNumber,
+            query: coreTerms,
+            sources: ['arxiv', 'semantic_scholar'],
+            resultsFound: papersFound.length,
+            timestamp: new Date(),
+            strategy: 'academic_skill_direct',
+          });
+          
+          if (papersFound.length > 0) {
+            const existingTitles = new Set(allPapers.map((p: any) => p.title?.toLowerCase()));
+            for (const paper of papersFound) {
+              if (!existingTitles.has(paper.title?.toLowerCase())) {
+                allPapers.push(paper);
+                existingTitles.add(paper.title?.toLowerCase());
+              }
+            }
+            console.log(`[RecallRecovery] Core terms found ${papersFound.length} papers, total: ${allPapers.length}`);
+          }
+        } catch (error) {
+          console.error(`[RecallRecovery] Core terms attempt failed:`, error);
+        }
+      }
+    }
+    
+    const recallExhausted = attemptNumber >= maxAttempts;
+    
+    return {
+      papers: allPapers,
+      recallAttempts,
+      queriesAttempted: Array.from(queriesAttempted),
+      recallExhausted,
+    };
+  },
+  
+  updateState(state, output) {
+    const validPapers = output.papers.filter((p: any) => 
+      p.title && p.abstract && p.abstract.length > 50
+    );
+    
+    return {
+      ...state,
+      discoveredPapers: output.papers,
+      validPapers,
+      recallAttempts: output.recallAttempts,
+      queriesAttempted: output.queriesAttempted,
+      recallExhausted: output.recallExhausted,
+      currentNode: 'recall_recovery',
+    };
+  },
+};
+
+/**
+ * Halt Node (Evidence Gap Report)
+ * Called ONLY after all recall strategies are exhausted
+ * Generates a structured report explaining why research cannot proceed
+ * 
+ * DESIGN: Halt is a NODE, not a default behavior
+ * This ensures the agent provides value even when papers cannot be found
+ */
+export const HaltNode: GraphNode<ResearchState, void, any> = {
+  id: 'halt',
+  name: 'Evidence Gap Report',
+  description: 'Generate structured report when all recall strategies exhausted',
+  
+  preconditions: [
+    {
+      name: 'recall_exhausted',
+      check: (state) => state.recallExhausted === true,
+      errorMessage: 'Halt should only be reached after recall exhaustion',
+      severity: 'error', // Non-fatal: allows continuing even if not exhausted
+    },
+  ],
+  
+  postconditions: [],
+  
+  async execute(state, _input, context) {
+    const queriesAttempted = state.queriesAttempted || [];
+    const sourcesAttempted = [...new Set(
+      (state.recallAttempts || []).flatMap(a => a.sources)
+    )];
+    const totalAttempts = state.recallAttempts?.length || 0;
+    const partialResults = state.discoveredPapers || [];
+    
+    // Generate gaps analysis
+    const gaps: string[] = [];
+    const recommendations: string[] = [];
+    
+    if (totalAttempts > 0 && partialResults.length === 0) {
+      gaps.push('No papers found across all search attempts');
+      recommendations.push('Consider reformulating the research question with more specific or general terms');
+      recommendations.push('Verify that the topic has published academic literature');
+    } else if (partialResults.length < 3) {
+      gaps.push(`Only ${partialResults.length} papers found, minimum 3 required for synthesis`);
+      recommendations.push('Consider expanding the search to related domains');
+      recommendations.push('Try using alternative terminology common in the field');
+    }
+    
+    if (sourcesAttempted.length < 2) {
+      gaps.push('Limited academic sources were available');
+      recommendations.push('Consider adding additional sources like PubMed or Google Scholar');
+    }
+    
+    // Generate human-readable report
+    const reportText = generateEvidenceGapReport({
+      originalQuery: state.searchQuery || '',
+      queriesAttempted,
+      sourcesAttempted,
+      totalAttempts,
+      partialResults,
+      gaps,
+      recommendations,
+    });
+    
+    return {
+      type: 'evidence_gap_report',
+      originalQuery: state.searchQuery,
+      queriesAttempted,
+      sourcesAttempted,
+      totalAttempts,
+      partialResults: partialResults.slice(0, 5), // Include up to 5 partial results
+      gaps,
+      recommendations,
+      reportText,
+      timestamp: new Date(),
+    };
+  },
+  
+  updateState(state, output) {
+    return {
+      ...state,
+      evidenceGapReport: {
+        queriesAttempted: output.queriesAttempted,
+        sourcesAttempted: output.sourcesAttempted,
+        totalAttempts: output.totalAttempts,
+        partialResults: output.partialResults,
+        gaps: output.gaps,
+        recommendations: output.recommendations,
+        timestamp: output.timestamp,
+      },
+      finalOutput: output.reportText,
+      status: 'completed', // NOT failed - this is a valid completion with evidence gap report
+      currentNode: 'halt',
+    };
+  },
+};
+
+/**
+ * Generate human-readable Evidence Gap Report
+ */
+function generateEvidenceGapReport(data: {
+  originalQuery: string;
+  queriesAttempted: string[];
+  sourcesAttempted: string[];
+  totalAttempts: number;
+  partialResults: any[];
+  gaps: string[];
+  recommendations: string[];
+}): string {
+  let report = `# Research Process & Evidence Gap Report\n\n`;
+  
+  report += `## Original Research Query\n`;
+  report += `"${data.originalQuery}"\n\n`;
+  
+  report += `## Search Summary\n`;
+  report += `- **Total search attempts**: ${data.totalAttempts}\n`;
+  report += `- **Sources searched**: ${data.sourcesAttempted.join(', ') || 'None'}\n`;
+  report += `- **Papers found**: ${data.partialResults.length}\n\n`;
+  
+  report += `## Queries Attempted\n`;
+  if (data.queriesAttempted.length > 0) {
+    for (const query of data.queriesAttempted) {
+      report += `- "${query}"\n`;
+    }
+  } else {
+    report += `- No queries were executed\n`;
+  }
+  report += `\n`;
+  
+  report += `## Identified Gaps\n`;
+  if (data.gaps.length > 0) {
+    for (const gap of data.gaps) {
+      report += `- ${gap}\n`;
+    }
+  } else {
+    report += `- No specific gaps identified\n`;
+  }
+  report += `\n`;
+  
+  if (data.partialResults.length > 0) {
+    report += `## Partial Results\n`;
+    report += `The following papers were found but insufficient for comprehensive synthesis:\n\n`;
+    for (const paper of data.partialResults.slice(0, 5)) {
+      report += `### ${paper.title}\n`;
+      report += `- **Authors**: ${paper.authors?.join(', ') || 'Unknown'}\n`;
+      report += `- **Source**: ${paper.source || 'Unknown'}\n`;
+      if (paper.url) report += `- **URL**: ${paper.url}\n`;
+      report += `\n`;
+    }
+  }
+  
+  report += `## Recommendations\n`;
+  if (data.recommendations.length > 0) {
+    for (const rec of data.recommendations) {
+      report += `- ${rec}\n`;
+    }
+  } else {
+    report += `- No specific recommendations\n`;
+  }
+  report += `\n`;
+  
+  report += `## Next Steps\n`;
+  report += `This report documents the research process and findings. To proceed:\n`;
+  report += `1. Review the partial results above for relevance\n`;
+  report += `2. Consider the recommendations for refining your search\n`;
+  report += `3. Provide additional context or domain-specific terminology\n`;
+  report += `4. Specify particular venues, authors, or time periods if known\n\n`;
+  
+  report += `---\n`;
+  report += `*Report generated at ${new Date().toISOString()}*\n`;
+  
+  return report;
+}
+
+/**
  * Failure Handler Node
  * Handles graph execution failures gracefully
+ * NOTE: This is for unexpected errors, not for zero-result searches
  */
 export const FailureHandlerNode: GraphNode<AgentState, void, any> = {
   id: 'failure_handler',
   name: 'Failure Handler',
-  description: 'Handle execution failures and produce failure report',
+  description: 'Handle unexpected execution failures and produce failure report',
   
   preconditions: [],
   postconditions: [],
@@ -813,10 +1405,12 @@ export const NodeRegistry = {
   // Research
   paper_discovery: PaperDiscoveryNode,
   discovery_validation: DiscoveryValidationNode,
+  recall_recovery: RecallRecoveryNode,
   paper_summarize: PaperSummarizeNode,
   paper_compare: PaperCompareNode,
   synthesis: SynthesisNode,
   final_writer: FinalWriterNode,
+  halt: HaltNode,
   
   // Failure handling
   failure_handler: FailureHandlerNode,

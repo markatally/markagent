@@ -18,10 +18,12 @@ import {
   IntentParsingNode,
   PaperDiscoveryNode,
   DiscoveryValidationNode,
+  RecallRecoveryNode,
   PaperSummarizeNode,
   PaperCompareNode,
   SynthesisNode,
   FinalWriterNode,
+  HaltNode,
   FailureHandlerNode,
   type NodeContext,
   type GraphNode,
@@ -176,31 +178,51 @@ export class GraphExecutor<TState extends AgentState> {
 // ============================================================
 
 /**
+ * Minimum papers required for comprehensive synthesis
+ * This is a verification constraint, NOT a recall constraint
+ */
+const MIN_PAPERS_FOR_SYNTHESIS = 3;
+
+/**
  * Create the Research scenario graph
  * 
+ * RECALL-PERMISSIVE DESIGN:
+ * - Zero results from initial discovery trigger recovery, not failure
+ * - Recovery attempts multiple strategies before considering halt
+ * - HaltNode produces Evidence Gap Report instead of generic failure
+ * - Constraints applied during verification, not search
+ * 
  * Flow:
- * PaperDiscovery -> DiscoveryValidation -> (continue/fail)
+ * PaperDiscovery -> DiscoveryValidation -> (continue/recover/halt)
  *   continue -> PaperSummarize -> PaperCompare -> Synthesis -> FinalWriter -> END
- *   fail -> FailureHandler -> END
+ *   recover -> RecallRecovery -> DiscoveryValidation (loop back)
+ *   halt -> HaltNode (Evidence Gap Report) -> END
  */
 export function createResearchGraph(): GraphDefinition<ResearchState> {
   const nodes = new Map<string, GraphNode<ResearchState, any, any>>();
   
   nodes.set('paper_discovery', PaperDiscoveryNode);
   nodes.set('discovery_validation', DiscoveryValidationNode);
+  nodes.set('recall_recovery', RecallRecoveryNode);
   nodes.set('paper_summarize', PaperSummarizeNode);
   nodes.set('paper_compare', PaperCompareNode);
   nodes.set('synthesis', SynthesisNode);
   nodes.set('final_writer', FinalWriterNode);
+  nodes.set('halt', HaltNode as unknown as GraphNode<ResearchState, any, any>);
   nodes.set('failure_handler', FailureHandlerNode as unknown as GraphNode<ResearchState, any, any>);
   
   const edges: Edge[] = [
     { from: 'paper_discovery', to: 'discovery_validation' },
-    // Discovery validation routes via conditional edge
+    // Discovery validation routes via conditional edge (see below)
+    // Recovery routes back to validation
+    { from: 'recall_recovery', to: 'discovery_validation' },
+    // Main research pipeline
     { from: 'paper_summarize', to: 'paper_compare' },
     { from: 'paper_compare', to: 'synthesis' },
     { from: 'synthesis', to: 'final_writer' },
     { from: 'final_writer', to: 'END' },
+    // Terminal nodes
+    { from: 'halt', to: 'END' },
     { from: 'failure_handler', to: 'END' },
   ];
   
@@ -208,15 +230,27 @@ export function createResearchGraph(): GraphDefinition<ResearchState> {
     {
       from: 'discovery_validation',
       condition: (state) => {
-        // HARD CONSTRAINT: Must have at least 3 valid papers
-        if (state.validPapers.length < 3) {
-          return 'fail';
+        const paperCount = state.validPapers.length;
+        const recallExhausted = state.recallExhausted === true;
+        
+        // Case 1: Sufficient papers - continue to synthesis
+        if (paperCount >= MIN_PAPERS_FOR_SYNTHESIS) {
+          return 'continue';
         }
-        return 'continue';
+        
+        // Case 2: Insufficient papers but recall not exhausted - try recovery
+        if (!recallExhausted) {
+          return 'recover';
+        }
+        
+        // Case 3: Recall exhausted - go to halt node for evidence gap report
+        // NOTE: This is NOT a failure - it's a valid completion with documentation
+        return 'halt';
       },
       routes: {
         continue: 'paper_summarize',
-        fail: 'failure_handler',
+        recover: 'recall_recovery',
+        halt: 'halt',
       },
     },
   ];
@@ -498,10 +532,17 @@ export class AgentRouter {
       discoveredPapers: [],
       validPapers: [],
       discoveryMetadata: undefined,
+      // Recall tracking for multi-attempt recovery
+      recallAttempts: [],
+      queriesAttempted: [],
+      maxRecallAttempts: 5,
+      recallExhausted: false,
+      // Remaining research state
       paperSummaries: {},
       comparisonMatrix: undefined,
       synthesizedClaims: [],
       finalReport: undefined,
+      evidenceGapReport: undefined,
     };
   }
   

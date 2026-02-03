@@ -8,6 +8,7 @@ import { getConfig } from '../services/config';
 import { getToolRegistry, getToolExecutor, type ToolContext } from '../services/tools';
 import { getSkillProcessor } from '../services/skills/processor';
 import { getTaskManager } from '../services/tasks';
+import { processAgentOutput } from '../services/table';
 import path from 'path';
 
 // LangGraph imports (optional - for graph-based agent execution)
@@ -143,7 +144,8 @@ async function processAgentTurn(
     // === Step 2: Process based on what LLM returned ===
     if (!hasToolCalls) {
       // No tool calls = final answer
-      finalContent = stepContent;
+      // Process any structured table JSON blocks into rendered markdown
+      finalContent = processAgentOutput(stepContent);
 
       await sseStream.writeSSE({
         data: JSON.stringify({
@@ -1000,6 +1002,9 @@ stream.post('/sessions/:sessionId/agent', async (c) => {
         } else {
           finalContent = 'Agent completed successfully but produced no output.';
         }
+        
+        // Process any structured table JSON blocks into rendered markdown
+        finalContent = processAgentOutput(finalContent);
 
         // Save assistant message
         const assistantMessage = await prisma.message.create({

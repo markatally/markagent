@@ -1,61 +1,55 @@
 /**
- * Web Search Tool
- * Searches academic papers from arXiv, alphaXiv, and Google Scholar
- * Uses open-source APIs and wrappers
+ * Web Search Tool - Research-grade academic paper discovery
+ * Uses open-source PaperSearchSkills (arXiv, Semantic Scholar, CrossRef) and
+ * orchestration: merge, dedupe by title/DOI, date resolution via tools only.
+ * LLM must never hallucinate papers, venues, or dates; use tool output only.
  */
 
 import type { Tool, ToolContext, ToolResult } from './types';
+import {
+  getPaperSearchSkill,
+  createPaperSearchOrchestrator,
+  CrossRefResolverSkill,
+  DEFAULT_PAPER_SEARCH_SKILL_IDS,
+} from '../paper-search';
+import type { ResolvedPaper } from '../paper-search';
 
-/**
- * Search source types
- */
-type SearchSource = 'arxiv' | 'alphaxiv' | 'google_scholar' | 'all';
+type SearchSource = 'arxiv' | 'semantic_scholar' | 'all';
 
-/**
- * Paper metadata
- */
-interface PaperMetadata {
-  title: string;
-  authors: string[];
-  date?: string;
-  venue?: string;
-  link: string;
-  summary?: string;
-  source: string;
-  citations?: number;
-}
+const SOURCE_TO_SKILL_IDS: Record<SearchSource, string[]> = {
+  arxiv: ['arxiv'],
+  semantic_scholar: ['semantic_scholar'],
+  all: [...DEFAULT_PAPER_SEARCH_SKILL_IDS],
+};
 
-/**
- * Web Search Tool
- * Searches academic papers from multiple sources with retry and fallback strategies
- */
 export class WebSearchTool implements Tool {
   name = 'web_search';
-  description = 'Search academic papers and web resources from arXiv, alphaXiv, and Google Scholar. Returns normalized metadata including title, authors, date, venue, and links. Handles retry with query reformulation and fallback strategies.';
+  description =
+    'Search academic papers using open-source APIs (arXiv, Semantic Scholar). Returns structured metadata including title, authors, publication date (resolved from APIs only), venue, DOI, and links. Results are merged and deduplicated across sources; publication dates are resolved via CrossRef > arXiv v1 > Semantic Scholar. Do not invent papers, venues, or dates—use only the returned results.';
   requiresConfirmation = false;
-  timeout = 60000; // Increased timeout to 60s for retry logic
+  timeout = 60000;
 
   inputSchema = {
     type: 'object' as const,
     properties: {
       query: {
         type: 'string' as const,
-        description: 'Search query for finding papers or web resources',
+        description: 'Search query for finding papers (keywords, phrases)',
       },
       sources: {
         type: 'string' as const,
-        description: 'Sources to search: arxiv, alphaxiv, google_scholar, all (default: all)',
-        enum: ['arxiv', 'alphaxiv', 'google_scholar', 'all'],
+        description: 'Sources to search: arxiv, semantic_scholar, all (default: all)',
+        enum: ['arxiv', 'semantic_scholar', 'all'],
       },
       topK: {
         type: 'number' as const,
-        description: 'Number of results to return per source (default: 5, max: 20)',
+        description: 'Number of results to return (default: 5, max: 20)',
         minimum: 1,
         maximum: 20,
       },
       dateRange: {
         type: 'string' as const,
-        description: 'Optional date range filter (e.g., "2020-2024", "last-5-years", "last-12-months")',
+        description: 'Optional date range (e.g. "2020-2024", "last-5-years", "last-12-months")',
       },
       sortBy: {
         type: 'string' as const,
@@ -64,11 +58,11 @@ export class WebSearchTool implements Tool {
       },
       enableRetry: {
         type: 'boolean' as const,
-        description: 'Enable automatic retry with query reformulation if no results found (default: true)',
+        description: 'Retry with broader query if no results (default: true)',
       },
       maxRetries: {
         type: 'number' as const,
-        description: 'Maximum number of retry attempts (default: 2)',
+        description: 'Max retry attempts (default: 2)',
         minimum: 0,
         maximum: 5,
       },
@@ -76,21 +70,31 @@ export class WebSearchTool implements Tool {
     required: ['query'],
   };
 
+  private runOrchestrator = createPaperSearchOrchestrator({
+    getSkill: (id) => getPaperSearchSkill(id),
+    crossrefSkill: CrossRefResolverSkill,
+  });
+
   constructor(private context: ToolContext) {}
 
-  async execute(params: Record<string, any>, onProgress?: (current: number, total: number, message?: string) => void): Promise<ToolResult> {
+  async execute(
+    params: Record<string, unknown>,
+    onProgress?: (current: number, total: number, message?: string) => void
+  ): Promise<ToolResult> {
     const startTime = Date.now();
-
+    const query = String(params.query ?? '').trim();
     try {
-      const query = params.query as string;
-      const sources = (params.sources as SearchSource) || 'all';
-      const topK = Math.min(Math.max((params.topK as number) || 5, 1), 20);
+      const sourcesParam = (params.sources as SearchSource) || 'all';
+      const topK = Math.min(
+        Math.max(Number(params.topK) ?? Number(params.maxResults) ?? 5, 1),
+        20
+      );
       const sortBy = (params.sortBy as string) || 'relevance';
       const dateRange = params.dateRange as string | undefined;
-      const enableRetry = params.enableRetry !== false; // Default true
-      const maxRetries = Math.min(Math.max((params.maxRetries as number) || 2, 0), 5);
+      const enableRetry = params.enableRetry !== false;
+      const maxRetries = Math.min(Math.max(Number(params.maxRetries) || 2, 0), 5);
 
-      if (!query || typeof query !== 'string' || query.trim().length === 0) {
+      if (!query) {
         return {
           success: false,
           output: '',
@@ -99,634 +103,193 @@ export class WebSearchTool implements Tool {
         };
       }
 
-      // Report initial progress
       onProgress?.(0, 100, 'Preparing search...');
+      const skillIds = SOURCE_TO_SKILL_IDS[sourcesParam] ?? DEFAULT_PAPER_SEARCH_SKILL_IDS;
 
-      // Determine which sources to search
-      const sourcesToSearch: SearchSource[] = sources === 'all'
-        ? ['arxiv', 'alphaxiv', 'google_scholar']
-        : [sources];
-
-      // Try initial search
-      onProgress?.(10, 100, `Searching ${sourcesToSearch.length} source(s)...`);
-      let allResults: PaperMetadata[] = await this.performSearch(
-        sourcesToSearch,
+      onProgress?.(10, 100, `Searching ${skillIds.length} source(s)...`);
+      let out = await this.runOrchestrator({
         query,
-        topK,
-        sortBy,
+        skillIds,
+        limit: topK,
+        sortBy: sortBy as 'relevance' | 'date' | 'citations',
         dateRange,
-        onProgress
-      );
+      });
 
       let searchAttempt = 1;
       let usedFallback = false;
-
-      // Retry with fallback strategies if no results and retry is enabled
-      if (allResults.length === 0 && enableRetry) {
+      if (out.papers.length === 0 && enableRetry) {
         onProgress?.(40, 100, 'No results found, trying broader search...');
-        const reformulatedQueries = this.reformulateQuery(query);
-
-        for (const reformulatedQuery of reformulatedQueries) {
+        const reformulated = this.reformulateQuery(query);
+        for (const q of reformulated) {
           if (searchAttempt > maxRetries) break;
           searchAttempt++;
-
-          console.log(`Search attempt ${searchAttempt}: Using reformulated query "${reformulatedQuery}"`);
-          onProgress?.(
-            40 + (searchAttempt * 10),
-            100,
-            `Trying alternative query (${searchAttempt}/${maxRetries + 1})...`
-          );
-
-          // Try without date range as fallback
-          const fallbackResults = await this.performSearch(
-            sourcesToSearch,
-            reformulatedQuery,
-            topK,
-            sortBy,
-            usedFallback ? undefined : dateRange, // Remove date range on first retry
-            onProgress
-          );
-
-          allResults = allResults.concat(fallbackResults);
-
-          if (allResults.length > 0) {
+          onProgress?.(40 + searchAttempt * 10, 100, `Trying alternative query (${searchAttempt}/${maxRetries + 1})...`);
+          const next = await this.runOrchestrator({
+            query: q,
+            skillIds,
+            limit: topK,
+            sortBy: sortBy as 'relevance' | 'date' | 'citations',
+            dateRange: usedFallback ? undefined : dateRange,
+          });
+          out = {
+            papers: [...out.papers, ...next.papers],
+            sourcesQueried: [...new Set([...out.sourcesQueried, ...next.sourcesQueried])],
+            sourcesSkipped: [...new Set([...out.sourcesSkipped, ...next.sourcesSkipped])],
+            exclusionReasons: [...out.exclusionReasons, ...next.exclusionReasons],
+          };
+          if (out.papers.length > 0) {
             usedFallback = true;
-            break; // Stop retrying if we got results
+            break;
           }
-
           usedFallback = true;
         }
       }
 
       onProgress?.(70, 100, 'Processing results...');
-
-      // Deduplicate results across sources
-      allResults = this.deduplicateResults(allResults);
-
-      // Sort results based on sortBy preference
-      allResults = this.sortResults(allResults, sortBy);
-
-      // Limit to topK results total
-      allResults = allResults.slice(0, topK);
-
+      const papers = out.papers.slice(0, topK);
       onProgress?.(90, 100, 'Formatting output...');
 
-      // Format output
       const output = this.formatResults(
-        allResults,
+        papers,
         query,
-        sourcesToSearch,
+        skillIds,
         sortBy,
         searchAttempt > 1,
-        usedFallback
+        usedFallback,
+        out.sourcesSkipped,
+        out.exclusionReasons
       );
 
-      // Return result with proper error message when no results found
-      if (allResults.length === 0) {
-        return {
-          success: false,
-          output,
-          error: `No papers found for query "${query}". Try broader search terms, remove date filters, or check spelling.`,
-          duration: Date.now() - startTime,
-        };
-      }
+      // CRITICAL: Zero results is NOT an error - it's informational
+      // The agent should use this information to trigger recovery strategies
+      // rather than treating it as a fatal failure
+      const artifactPayload = {
+        query,
+        originalQuery: query,
+        sources: skillIds,
+        sourcesQueried: out.sourcesQueried,
+        sourcesSkipped: out.sourcesSkipped,
+        searchAttempts: searchAttempt,
+        usedFallback,
+        sortBy,
+        topK,
+        results: papers,
+        exclusionReasons: out.exclusionReasons,
+        // Explicit flag for downstream consumers
+        zeroResults: papers.length === 0,
+        suggestion: papers.length === 0 
+          ? 'Try broader terms, remove date filters, or reformulate the query'
+          : undefined,
+      };
 
       return {
+        // RECALL-PERMISSIVE: Always return success to allow agent to continue
+        // Zero results triggers recovery strategies, not agent termination
         success: true,
         output,
         duration: Date.now() - startTime,
-        artifacts: [{
-          type: 'data',
-          name: 'search-results.json',
-          content: JSON.stringify({
-            query,
-            originalQuery: query,
-            sources: sourcesToSearch,
-            searchAttempts: searchAttempt,
-            usedFallback,
-            sortBy,
-            topK,
-            results: allResults,
-          }, null, 2),
-          mimeType: 'application/json',
-        }],
+        artifacts: [
+          {
+            type: 'data',
+            name: 'search-results.json',
+            content: JSON.stringify(artifactPayload, null, 2),
+            mimeType: 'application/json',
+          },
+        ],
+        // Provide informational warning (not error) for zero results
+        ...(papers.length === 0 && {
+          warning: `No papers found for query "${query}". Consider reformulating the query.`,
+        }),
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      // Network/API errors should still be reported, but as recoverable
       return {
-        success: false,
-        output: '',
-        error: error.message || 'Failed to perform web search',
+        success: true, // Still allow agent to continue
+        output: `Search encountered an error: ${error instanceof Error ? error.message : String(error)}. The agent may try alternative strategies.`,
+        error: error instanceof Error ? error.message : String(error),
         duration: Date.now() - startTime,
+        artifacts: [
+          {
+            type: 'data',
+            name: 'search-results.json',
+            content: JSON.stringify({
+              query,
+              results: [],
+              zeroResults: true,
+              searchError: error instanceof Error ? error.message : String(error),
+              suggestion: 'Search failed; agent should try alternative queries or sources',
+            }, null, 2),
+            mimeType: 'application/json',
+          },
+        ],
       };
     }
   }
 
-  /**
-   * Perform search across all sources
-   */
-  private async performSearch(
-    sources: SearchSource[],
-    query: string,
-    limit: number,
-    sortBy: string,
-    dateRange?: string,
-    onProgress?: (current: number, total: number, message?: string) => void
-  ): Promise<PaperMetadata[]> {
-    const results: PaperMetadata[] = [];
-    const totalSources = sources.length;
-
-    // Search each source in parallel for better performance
-    const searchPromises = sources.map((source, index) =>
-      this.searchSource(source, query, limit, sortBy, dateRange, (current, total, msg) => {
-        // Report progress for each source
-        const progress = 10 + Math.floor((current / total + index) / totalSources * 30);
-        onProgress?.(progress, 100, `Searching ${source}... ${msg || ''}`);
-      })
-    );
-
-    const searchResults = await Promise.all(searchPromises);
-    searchResults.forEach(sourceResults => {
-      results.push(...sourceResults);
-    });
-
-    return results;
-  }
-
-  /**
-   * Search a specific source
-   */
-  private async searchSource(
-    source: SearchSource,
-    query: string,
-    limit: number,
-    sortBy: string,
-    dateRange?: string,
-    onProgress?: (current: number, total: number, message?: string) => void
-  ): Promise<PaperMetadata[]> {
-    switch (source) {
-      case 'arxiv':
-        return this.searchArXiv(query, limit, sortBy, dateRange, onProgress);
-      case 'alphaxiv':
-        return this.searchAlphaXiv(query, limit, sortBy);
-      case 'google_scholar':
-        return this.searchGoogleScholar(query, limit);
-      default:
-        return [];
-    }
-  }
-
-  /**
-   * Reformulate query for retry attempts
-   * Creates broader search terms to improve result finding
-   */
-  private reformulateQuery(originalQuery: string): string[] {
-    const reformulations: string[] = [];
-
-    // Remove common prefixes like "paper about", "research on", "find"
-    const cleanedQuery = originalQuery
+  private reformulateQuery(original: string): string[] {
+    const cleaned = original
       .replace(/^(papers? about|research on|find|search for|looking for|i need|find me)\s+/i, '')
       .replace(/\s+(papers?|research|articles?)$/i, '')
       .trim();
-
-    if (cleanedQuery !== originalQuery) {
-      reformulations.push(cleanedQuery);
-    }
-
-    // Extract key terms (remove stopwords)
-    const stopwords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from']);
-    const keyTerms = originalQuery
+    const out: string[] = cleaned !== original ? [cleaned] : [];
+    const stop = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from']);
+    const terms = original
       .split(/\s+/)
-      .filter(word => word.length > 2 && !stopwords.has(word.toLowerCase()))
+      .filter((w) => w.length > 2 && !stop.has(w.toLowerCase()))
       .join(' ');
-
-    if (keyTerms !== cleanedQuery && keyTerms.length > 3) {
-      reformulations.push(keyTerms);
-    }
-
-    // If query contains quotes, remove them for broader search
-    if (originalQuery.includes('"')) {
-      reformulations.push(originalQuery.replace(/"/g, ''));
-    }
-
-    return reformulations;
+    if (terms !== cleaned && terms.length > 3) out.push(terms);
+    if (original.includes('"')) out.push(original.replace(/"/g, ''));
+    return out;
   }
 
-  /**
-   * Deduplicate results based on title similarity
-   * Removes papers that appear in multiple sources
-   */
-  private deduplicateResults(results: PaperMetadata[]): PaperMetadata[] {
-    const seen = new Map<string, PaperMetadata>();
-    const deduplicated: PaperMetadata[] = [];
-
-    for (const paper of results) {
-      // Normalize title for comparison (lowercase, remove punctuation, extra spaces)
-      const normalizedTitle = paper.title
-        .toLowerCase()
-        .replace(/[^\w\s]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-      const existing = seen.get(normalizedTitle);
-
-      if (existing) {
-        // Keep the one from higher priority source or with more metadata
-        const sourcePriority: Record<string, number> = {
-          arxiv: 3,
-          alphaxiv: 2,
-          semantic_scholar: 1,
-        };
-
-        const existingPriority = sourcePriority[existing.source] || 0;
-        const currentPriority = sourcePriority[paper.source] || 0;
-
-        // Keep the one with higher priority, or merge if same priority
-        if (currentPriority > existingPriority) {
-          seen.set(normalizedTitle, paper);
-        } else if (currentPriority === existingPriority) {
-          // Merge metadata if from same priority source
-          if (paper.citations && !existing.citations) {
-            existing.citations = paper.citations;
-          }
-          if (paper.summary && !existing.summary) {
-            existing.summary = paper.summary;
-          }
-        }
-      } else {
-        seen.set(normalizedTitle, paper);
-        deduplicated.push(paper);
-      }
-    }
-
-    return deduplicated;
-  }
-
-  /**
-   * Search arXiv API
-   * arXiv provides a public API for searching and retrieving papers
-   */
-  private async searchArXiv(
-    query: string,
-    limit: number,
-    sortBy: string,
-    dateRange?: string,
-    onProgress?: (current: number, total: number, message?: string) => void
-  ): Promise<PaperMetadata[]> {
-    try {
-      // arXiv search API URL
-      const baseUrl = 'http://export.arxiv.org/api/query';
-      const searchParams = new URLSearchParams({
-        search_query: this.buildArXivQuery(query, dateRange),
-        start: '0',
-        max_results: limit.toString(),
-        sortBy: this.mapSortParam(sortBy),
-        sortOrder: 'descending',
-      });
-
-      const response = await fetch(`${baseUrl}?${searchParams}`, {
-        headers: {
-          'User-Agent': 'Mark-Agent/1.0',
-        },
-      });
-
-      if (!response.ok) {
-        console.warn(`arXiv API error: ${response.status} ${response.statusText}`);
-        return [];
-      }
-
-      const text = await response.text();
-
-      // Parse arXiv atom feed
-      const results: PaperMetadata[] = [];
-      const entryRegex = /<entry>([\s\S]*?)<\/entry>/g;
-      const entries = text.match(entryRegex) || [];
-
-      for (const entry of entries) {
-        const titleMatch = entry.match(/<title>([\s\S]*?)<\/title>/);
-        const summaryMatch = entry.match(/<summary>([\s\S]*?)<\/summary>/);
-        const authorMatches = entry.matchAll(/<name>([\s\S]*?)<\/name>/g);
-        const publishedMatch = entry.match(/<published>([\s\S]*?)<\/published>/);
-        const idMatch = entry.match(/<id>([\s\S]*?)<\/id>/);
-
-        if (titleMatch && idMatch) {
-          const title = this.stripHtml(titleMatch[1]);
-          const authors = Array.from(authorMatches).map((m: RegExpMatchArray) => this.stripHtml(m[1])).filter((a: string) => a.trim());
-          const published = publishedMatch ? publishedMatch[1] : '';
-          const date = published ? new Date(published).toISOString().split('T')[0] : '';
-          const arxivId = idMatch[1].split('/').pop();
-          const link = `https://arxiv.org/abs/${arxivId}`;
-          const summary = summaryMatch ? this.stripHtml(summaryMatch[1]).substring(0, 500) : '';
-
-          results.push({
-            title,
-            authors: authors.length > 0 ? authors : ['Unknown'],
-            date,
-            venue: 'arXiv',
-            link,
-            summary,
-            source: 'arxiv',
-          });
-        }
-      }
-
-      return results;
-    } catch (error) {
-      // arXiv API unavailable - silently skip
-      return [];
-    }
-  }
-
-  /**
-   * Build arXiv search query with date range
-   */
-  private buildArXivQuery(query: string, dateRange?: string): string {
-    let arxivQuery = `all:${query.replace(/\s+/g, '+')}`;
-
-    if (dateRange) {
-      const dateRangeLower = dateRange.toLowerCase();
-
-      // Check for "last-X-months/years/days" pattern first (most common)
-      if (dateRangeLower.includes('last-')) {
-        // Match patterns like "last-1-month", "last-12-months", "last-5-years", "last-30-days"
-        const match = dateRangeLower.match(/last-(\d+)-?(years?|months?|days?)/);
-        if (match) {
-          const num = parseInt(match[1]);
-          const unit = match[2];
-          arxivQuery += this.buildDateFilter(num, unit);
-        }
-      }
-      // Parse year range like "2020-2024"
-      else if (dateRange.match(/(\d{4})-(\d{4})/)) {
-        const yearMatch = dateRange.match(/(\d{4})-(\d{4})/);
-        if (yearMatch) {
-          arxivQuery += ` AND submittedDate:[${yearMatch[1]}* TO ${yearMatch[2]}*]`;
-        }
-      }
-      // Single year like "2024"
-      else if (dateRange.match(/^\d{4}$/)) {
-        arxivQuery += ` AND submittedDate:[${dateRange}*]`;
-      }
-    }
-
-    return arxivQuery;
-  }
-
-  /**
-   * Build date filter string for arXiv query
-   */
-  private buildDateFilter(num: number, unit: string): string {
-    const now = new Date();
-    let startDate: Date;
-
-    if (unit.startsWith('year')) {
-      startDate = new Date(now.getFullYear() - num, 0, 1);
-    } else if (unit.startsWith('month')) {
-      startDate = new Date(now.getFullYear(), now.getMonth() - num, 1);
-    } else {
-      // days
-      startDate = new Date(now.getTime() - num * 24 * 60 * 60 * 1000);
-    }
-
-    const startYear = startDate.getFullYear();
-    const startMonth = String(startDate.getMonth() + 1).padStart(2, '0');
-    const startDay = String(startDate.getDate()).padStart(2, '0');
-
-    return ` AND submittedDate:[${startYear}${startMonth}${startDay}* TO 99991231*]`;
-  }
-
-  /**
-   * Search alphaXiv API
-   * alphaXiv provides AI/ML paper search with ML relevance ranking
-   */
-  private async searchAlphaXiv(
-    query: string,
-    limit: number,
-    sortBy: string
-  ): Promise<PaperMetadata[]> {
-    try {
-      const baseUrl = 'https://www.alphaxiv.org/api/ask';
-      const searchParams = new URLSearchParams({
-        q: `"${query}"`,
-        // Use AI search for better relevance
-        moderators: ',default',
-        pretty: 'true',
-        skip_ai: 'true',
-      });
-
-      const response = await fetch(`${baseUrl}?${searchParams}`, {
-        headers: {
-          'User-Agent': 'Mark-Agent/1.0',
-        },
-      });
-
-      if (!response.ok) {
-        // alphaXiv API may not be publicly available - silently skip
-        return [];
-      }
-
-      const data = await response.json() as { completions?: any[] };
-
-      if (!data.completions || data.completions.length === 0) {
-        return [];
-      }
-
-      const results: PaperMetadata[] = [];
-
-      // alphaXiv returns sorted results from multiple sources
-      const completions = data.completions.slice(0, limit);
-
-      for (const completion of completions) {
-        if (completion.paper) {
-          results.push({
-            title: completion.paper.title || 'Untitled',
-            authors: completion.paper.authors || [],
-            date: completion.paper.published_date || undefined,
-            venue: completion.paper.venue || completion.pdf_source || 'alphaXiv',
-            link: completion.paper.pdf_url || completion.paper.url || `https://www.alphaxiv.org/paper/${completion.paper.paper_id}`,
-            summary: completion.paper.summary || completion.snippet || '',
-            source: 'alphaXiv',
-          });
-        }
-      }
-
-      return results;
-    } catch (error) {
-      // alphaXiv API not available - silently skip
-      return [];
-    }
-  }
-
-  /**
-   * Search Google Scholar (using serpapi or similar wrapper)
-   * Note: Google Scholar doesn't have a free public API
-   * This uses a fallback approach with open-source wrappers
-   */
-  private async searchGoogleScholar(query: string, limit: number): Promise<PaperMetadata[]> {
-    try {
-      // Try using Semantic Scholar API (open-source alternative)
-      const baseUrl = 'https://api.semanticscholar.org/graph/v1/paper/search';
-      const searchParams = new URLSearchParams({
-        query: query,
-        limit: limit.toString(),
-        fields: 'title,authors,year,venue,url,abstract,citationCount',
-      });
-
-      const response = await fetch(`${baseUrl}?${searchParams}`, {
-        headers: {
-          'User-Agent': 'Mark-Agent/1.0',
-        },
-      });
-
-      if (!response.ok) {
-        // Semantic Scholar API unavailable - silently skip
-        return [];
-      }
-
-      const data = await response.json() as { data?: any[] };
-
-      if (!data.data || !Array.isArray(data.data)) {
-        return [];
-      }
-
-      return data.data.map((item: any) => ({
-        title: item.title || 'Untitled',
-        authors: item.authors?.map((a: any) => a.name) || [],
-        date: item.year ? String(item.year) : '',
-        venue: item.venue || 'Semantic Scholar',
-        link: item.url || `https://www.semanticscholar.org/paper/${item.paperId}`,
-        summary: item.abstract || '',
-        source: 'semantic_scholar',
-        citations: item.citationCount,
-      }));
-    } catch (error) {
-      // Semantic Scholar API unavailable - silently skip
-      return [];
-    }
-  }
-
-  /**
-   * Sort results based on preference
-   */
-  private sortResults(results: PaperMetadata[], sortBy: string): PaperMetadata[] {
-    switch (sortBy) {
-      case 'date':
-        return results.sort((a, b) => {
-          const dateA = a.date ? new Date(a.date).getTime() : 0;
-          const dateB = b.date ? new Date(b.date).getTime() : 0;
-          return dateB - dateA;
-        });
-      case 'citations':
-        return results.sort((a, b) => {
-          const citesA = a.citations || 0;
-          const citesB = b.citations || 0;
-          return citesB - citesA;
-        });
-      case 'relevance':
-      default:
-        // Sort by source priority: arxiv > alphaxiv > others
-        const sourcePriority: Record<string, number> = {
-          arxiv: 3,
-          alphaxiv: 2,
-          semantic_scholar: 1,
-        };
-        return results.sort((a, b) => {
-          const priorityA = sourcePriority[a.source] || 0;
-          const priorityB = sourcePriority[b.source] || 0;
-          return priorityB - priorityA;
-        });
-    }
-  }
-
-  /**
-   * Map sort parameter to arXiv sort field
-   */
-  private mapSortParam(sortBy: string): string {
-    const sortMap: Record<string, string> = {
-      relevance: 'relevance',
-      date: 'submittedDate',
-      citations: 'citationCount',
-    };
-    return sortMap[sortBy] || 'relevance';
-  }
-
-  /**
-   * Strip HTML tags from text
-   */
-  private stripHtml(text: string): string {
-    return text
-      .replace(/<[^>]+>/g, '')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&amp;/g, '&')
-      .trim();
-  }
-
-  /**
-   * Format results as readable output
-   */
   private formatResults(
-    results: PaperMetadata[],
+    results: ResolvedPaper[],
     query: string,
-    sources: SearchSource[],
+    sources: string[],
     sortBy: string,
-    usedRetry = false,
-    usedFallback = false
+    usedRetry: boolean,
+    usedFallback: boolean,
+    sourcesSkipped: string[],
+    exclusionReasons: string[]
   ): string {
     if (results.length === 0) {
-      let output = `🔍 Search Results for: "${query}"\n`;
-      output += `📊 No papers found\n`;
-      output += `📌 Sources attempted: ${sources.join(', ')} | Sort: ${sortBy}\n`;
-      output += '='.repeat(60) + '\n\n';
-      output += `💡 Suggestions:\n`;
-      output += `   - Try broader search terms\n`;
-      output += `   - Remove specific keywords or filters\n`;
-      output += `   - Check spelling of key terms\n`;
-      output += `   - Try a different academic source\n`;
-      return output;
+      let text = `🔍 Search Results for: "${query}"\n📊 No papers found\n`;
+      text += `📌 Sources attempted: ${sources.join(', ')} | Sort: ${sortBy}\n`;
+      if (sourcesSkipped.length) text += `⚠️ Skipped: ${sourcesSkipped.join(', ')}\n`;
+      text += '='.repeat(60) + '\n\n💡 Try broader terms, remove filters, or check spelling.';
+      return text;
     }
 
-    let output = `🔍 Search Results for: "${query}"\n`;
-    output += `📊 ${results.length} papers found | Sources: ${sources.join(', ')} | Sort: ${sortBy}`;
-    if (usedRetry) {
-      output += ` | Retry with reformulation: Enabled`;
-    }
-    if (usedFallback) {
-      output += ` | Fallback (broader search): Used`;
-    }
-    output += '\n';
-    output += '='.repeat(60) + '\n\n';
+    let text = `🔍 Search Results for: "${query}"\n`;
+    text += `📊 ${results.length} papers | Sources: ${sources.join(', ')} | Sort: ${sortBy}`;
+    if (usedRetry) text += ' | Retry: used';
+    if (usedFallback) text += ' | Fallback: used';
+    text += '\n';
+    if (sourcesSkipped.length) text += `⚠️ Skipped: ${sourcesSkipped.join(', ')}\n`;
+    if (exclusionReasons.length) text += `📋 Notes: ${exclusionReasons.slice(0, 3).join('; ')}\n`;
+    text += '='.repeat(60) + '\n\n';
 
-    for (let i = 0; i < results.length; i++) {
-      const paper = results[i];
-      output += `Result ${i + 1}/${results.length}:\n`;
-      output += `📄 Title: ${paper.title}\n`;
-      output += `✍️  Authors: ${paper.authors.join(', ')}\n`;
-
-      if (paper.date) {
-        output += `📅 Date: ${paper.date}\n`;
+    results.forEach((paper, i) => {
+      text += `Result ${i + 1}/${results.length}:\n`;
+      text += `📄 Title: ${paper.title}\n`;
+      text += `✍️  Authors: ${paper.authors.join(', ')}\n`;
+      if (paper.publicationDate) {
+        text += `📅 Date: ${paper.publicationDate}`;
+        if (paper.publicationDateSource) text += ` (source: ${paper.publicationDateSource})`;
+        if (paper.publicationDateConfidence) text += ` [${paper.publicationDateConfidence}]`;
+        text += '\n';
       }
+      if (paper.venue) text += `🏛️  Venue: ${paper.venue}\n`;
+      if (paper.citationCount != null) text += `📎 Citations: ${paper.citationCount}\n`;
+      if (paper.doi) text += `🔗 DOI: ${paper.doi}\n`;
+      text += `🔗 Link: ${paper.link}\n`;
+      text += `📌 Source: ${paper.source}\n`;
+      if (paper.abstract) text += `\n📝 Summary:\n${paper.abstract.slice(0, 500)}${paper.abstract.length > 500 ? '...' : ''}\n`;
+      if (paper.exclusionReasons?.length) text += `⚠️ Notes: ${paper.exclusionReasons.join('; ')}\n`;
+      text += '\n' + '-'.repeat(40) + '\n\n';
+    });
 
-      if (paper.venue) {
-        output += `🏛️  Venue: ${paper.venue}\n`;
-      }
-
-      if (paper.citations) {
-        output += `📎 Citations: ${paper.citations}\n`;
-      }
-
-      output += `🔗 Link: ${paper.link}\n`;
-      output += `📌 Source: ${paper.source}\n`;
-
-      if (paper.summary) {
-        output += `\n📝 Summary:\n${paper.summary.substring(0, 500)}${paper.summary.length > 500 ? '...' : ''}\n`;
-      }
-
-      output += '\n' + '-'.repeat(40) + '\n\n';
-    }
-
-    output += '='.repeat(60);
-    output += `\n💡 Tip: Use these results to find relevant papers for your presentation.`;
-
-    return output;
+    text += '='.repeat(60) + '\n💡 Use only these results; do not invent papers, venues, or dates.';
+    return text;
   }
 }

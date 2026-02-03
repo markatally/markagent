@@ -37,6 +37,9 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
   const messages = useChatStore((state) => state.messages.get(sessionId) || []);
   const streamingContent = useChatStore((state) => state.streamingContent);
   const isThinking = useChatStore((state) => state.isThinking);
+  const startTableBlock = useChatStore((state) => state.startTableBlock);
+  const completeTableBlock = useChatStore((state) => state.completeTableBlock);
+  const clearTables = useChatStore((state) => state.clearTables);
 
   // Scroll to bottom helper
   const scrollToBottom = () => {
@@ -120,6 +123,20 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
             content: '',
           };
           setFiles((prev) => [...prev, artifact]);
+        }
+        break;
+
+      case 'table.start':
+        // Table block started - schema is known, data is streaming
+        if (event.data?.tableId && event.data?.schema) {
+          startTableBlock(event.data.tableId, event.data.schema, event.data.caption);
+        }
+        break;
+
+      case 'table.complete':
+        // Table block completed - full Table IR data is available
+        if (event.data?.tableId && event.data?.table) {
+          completeTableBlock(event.data.tableId, event.data.table);
         }
         break;
 

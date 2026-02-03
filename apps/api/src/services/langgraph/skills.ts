@@ -261,11 +261,16 @@ export const PaperDiscoveryOutputSchema = z.object({
     source: z.enum(['arxiv', 'semantic_scholar', 'pubmed', 'google_scholar', 'other']),
     publishedDate: z.coerce.date().optional(),
     citationCount: z.number().optional(),
+    publicationDateSource: z.string().optional(),
+    publicationDateConfidence: z.enum(['high', 'medium', 'low']).optional(),
+    exclusionReasons: z.array(z.string()).optional(),
   })),
   metadata: z.object({
     totalFound: z.number(),
     sourcesSearched: z.array(z.string()),
     duration: z.number(),
+    sourcesSkipped: z.array(z.string()).optional(),
+    exclusionReasons: z.array(z.string()).optional(),
   }),
 });
 
@@ -276,8 +281,8 @@ export const PaperDiscoverySkill: AtomicSkill<PaperDiscoveryInput, PaperDiscover
   metadata: {
     id: 'paper_discovery',
     name: 'Paper Discovery',
-    version: '1.0.0',
-    description: 'Discovers academic papers from multiple sources based on search query',
+    version: '1.1.0', // Version bump for recall-permissive behavior
+    description: 'Discovers academic papers from multiple sources. Zero results are informational, not errors.',
     category: 'research',
     requiredTools: ['web_search'],
     estimatedDurationMs: 10000,
@@ -288,44 +293,127 @@ export const PaperDiscoverySkill: AtomicSkill<PaperDiscoveryInput, PaperDiscover
   outputSchema: PaperDiscoveryOutputSchema,
   
   async execute(input, context) {
-    const papers: Paper[] = [];
     const startTime = Date.now();
-    
-    // Use web_search tool for discovery (MANDATORY tool usage)
     const searchTool = context.tools.getTool('web_search');
-    
+
     if (!searchTool) {
-      throw new Error('web_search tool is required but not available');
+      // RECALL-PERMISSIVE: Return empty results instead of throwing
+      console.warn('[PaperDiscoverySkill] web_search tool not available, returning empty results');
+      return {
+        papers: [],
+        metadata: {
+          totalFound: 0,
+          sourcesSearched: [],
+          duration: Date.now() - startTime,
+          sourcesSkipped: ['web_search_unavailable'],
+          exclusionReasons: ['web_search tool is required but not available'],
+        },
+      };
     }
-    
-    // Search each source
-    for (const source of input.sources) {
-      try {
-        const searchQuery = `${input.query} ${source} research paper`;
-        const result = await searchTool.execute({ 
-          query: searchQuery,
-          maxResults: Math.ceil(input.maxResults / input.sources.length),
-        });
-        
-        if (result.success && result.output) {
-          // Parse results into Paper format
-          const sourcePapers = parseSearchResultsToPapers(result.output, source);
-          papers.push(...sourcePapers);
+
+    const sourcesParam =
+      input.sources.length === 0 || (input.sources.includes('arxiv') && input.sources.includes('semantic_scholar'))
+        ? 'all'
+        : input.sources[0] === 'arxiv'
+          ? 'arxiv'
+          : 'semantic_scholar';
+
+    let result;
+    try {
+      result = await searchTool.execute({
+        query: input.query,
+        sources: sourcesParam,
+        topK: input.maxResults,
+        // CRITICAL: Do not pass dateRange here - constraints applied during verification only
+      });
+    } catch (error) {
+      // RECALL-PERMISSIVE: Catch errors and return empty results
+      console.error('[PaperDiscoverySkill] Search failed:', error);
+      return {
+        papers: [],
+        metadata: {
+          totalFound: 0,
+          sourcesSearched: input.sources,
+          duration: Date.now() - startTime,
+          sourcesSkipped: [],
+          exclusionReasons: [`Search error: ${error instanceof Error ? error.message : String(error)}`],
+        },
+      };
+    }
+
+    let papers: Paper[] = [];
+
+    // Parse results from artifact (primary method)
+    if (result.artifacts?.length) {
+      const artifact = result.artifacts.find((a) => a.name === 'search-results.json');
+      if (artifact && typeof artifact.content === 'string') {
+        try {
+          const data = JSON.parse(artifact.content) as {
+            results?: Array<{
+              title: string;
+              authors: string[];
+              abstract?: string;
+              link: string;
+              source: string;
+              doi?: string | null;
+              publicationDate?: string | null;
+              publicationDateSource?: string | null;
+              publicationDateConfidence?: string | null;
+              venue?: string | null;
+              citationCount?: number | null;
+              exclusionReasons?: string[];
+            }>;
+            zeroResults?: boolean;
+            suggestion?: string;
+          };
+          if (data.results?.length) {
+            papers = data.results.map((r, i) => ({
+              id: r.doi ?? r.link ?? `paper_${i}`,
+              title: r.title,
+              authors: r.authors?.length ? r.authors : ['Unknown'],
+              abstract: r.abstract ?? '',
+              url: r.link,
+              source: mapSourceToPaperSource(r.source),
+              publishedDate: r.publicationDate ? new Date(r.publicationDate) : undefined,
+              citationCount: r.citationCount ?? undefined,
+              publicationDateSource: r.publicationDateSource ?? undefined,
+              publicationDateConfidence: (r.publicationDateConfidence as 'high' | 'medium' | 'low') ?? undefined,
+              exclusionReasons: r.exclusionReasons,
+            }));
+          }
+        } catch (e) {
+          console.error('[PaperDiscoverySkill] Failed to parse search-results.json:', e);
         }
-      } catch (error) {
-        console.error(`[PaperDiscoverySkill] Error searching ${source}:`, error);
       }
     }
-    
-    // Deduplicate by title similarity
+
+    // Fallback: Parse from output text if no artifact results
+    if (papers.length === 0 && result.output) {
+      for (const source of input.sources) {
+        papers.push(...parseSearchResultsToPapers(result.output, source));
+      }
+    }
+
     const uniquePapers = deduplicatePapers(papers);
-    
+    const data = result.artifacts?.[0];
+    const parsed = data && typeof data.content === 'string' ? (() => { try { return JSON.parse(data.content); } catch { return {}; } })() : {};
+    const sourcesSearched = parsed.sourcesQueried ?? input.sources;
+    const sourcesSkipped = parsed.sourcesSkipped ?? [];
+    const exclusionReasons = parsed.exclusionReasons ?? [];
+
+    // RECALL-PERMISSIVE: Log zero results but don't treat as error
+    if (uniquePapers.length === 0) {
+      console.log(`[PaperDiscoverySkill] Zero papers found for query "${input.query}". This is informational, not an error.`);
+    }
+
     return {
       papers: uniquePapers.slice(0, input.maxResults),
       metadata: {
-        totalFound: papers.length,
-        sourcesSearched: input.sources,
+        totalFound: uniquePapers.length,
+        sourcesSearched,
         duration: Date.now() - startTime,
+        sourcesSkipped: sourcesSkipped.length ? sourcesSkipped : undefined,
+        exclusionReasons: exclusionReasons.length ? exclusionReasons : undefined,
       },
     };
   },
@@ -790,8 +878,15 @@ function extractJSON(content: string): string {
   return content;
 }
 
+function mapSourceToPaperSource(source: string): 'arxiv' | 'semantic_scholar' | 'pubmed' | 'google_scholar' | 'other' {
+  if (source === 'arxiv' || source === 'semantic_scholar' || source === 'pubmed' || source === 'google_scholar') {
+    return source;
+  }
+  return 'other';
+}
+
 /**
- * Parse search results into Paper format
+ * Parse search results into Paper format (fallback when artifact not available)
  */
 function parseSearchResultsToPapers(output: string, source: string): Paper[] {
   const papers: Paper[] = [];

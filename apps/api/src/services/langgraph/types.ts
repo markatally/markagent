@@ -83,6 +83,7 @@ export const AgentStateSchema = z.object({
 
 /**
  * Academic paper metadata
+ * publicationDate resolved via tools only (CrossRef > arXiv v1 > Semantic Scholar).
  */
 export const PaperSchema = z.object({
   id: z.string(),
@@ -95,6 +96,12 @@ export const PaperSchema = z.object({
   citationCount: z.number().optional(),
   doi: z.string().optional(),
   keywords: z.array(z.string()).optional(),
+  /** Source of publication date when present (crossref | arxiv_v1 | semantic_scholar) */
+  publicationDateSource: z.string().optional(),
+  /** Confidence when date is known (high | medium | low) */
+  publicationDateConfidence: z.enum(['high', 'medium', 'low']).optional(),
+  /** Exclusion/constraint notes when partial results are included */
+  exclusionReasons: z.array(z.string()).optional(),
 });
 
 /**
@@ -154,6 +161,18 @@ export const ResearchReportSchema = z.object({
 });
 
 /**
+ * Recall attempt tracking for research recovery
+ */
+export const RecallAttemptSchema = z.object({
+  attemptNumber: z.number(),
+  query: z.string(),
+  sources: z.array(z.string()),
+  resultsFound: z.number(),
+  timestamp: z.coerce.date(),
+  strategy: z.enum(['original', 'simplified', 'sub_query', 'broadened', 'academic_skill_direct']),
+});
+
+/**
  * Research-specific state
  */
 export const ResearchStateSchema = AgentStateSchema.extend({
@@ -170,6 +189,12 @@ export const ResearchStateSchema = AgentStateSchema.extend({
     searchDuration: z.number(),
   }).optional(),
   
+  // Recall tracking (for multi-attempt recovery)
+  recallAttempts: z.array(RecallAttemptSchema).default([]),
+  queriesAttempted: z.array(z.string()).default([]),
+  maxRecallAttempts: z.number().default(5),
+  recallExhausted: z.boolean().default(false),
+  
   // Summarization phase
   paperSummaries: z.record(z.string(), PaperSummarySchema).default({}),
   
@@ -181,6 +206,17 @@ export const ResearchStateSchema = AgentStateSchema.extend({
   
   // Final output
   finalReport: ResearchReportSchema.optional(),
+  
+  // Evidence gap report (for graceful halt)
+  evidenceGapReport: z.object({
+    queriesAttempted: z.array(z.string()),
+    sourcesAttempted: z.array(z.string()),
+    totalAttempts: z.number(),
+    partialResults: z.array(PaperSchema).optional(),
+    gaps: z.array(z.string()),
+    recommendations: z.array(z.string()),
+    timestamp: z.coerce.date(),
+  }).optional(),
 });
 
 // ============================================================
@@ -357,6 +393,7 @@ export type PaperSummary = z.infer<typeof PaperSummarySchema>;
 export type Claim = z.infer<typeof ClaimSchema>;
 export type ComparisonMatrix = z.infer<typeof ComparisonMatrixSchema>;
 export type ResearchReport = z.infer<typeof ResearchReportSchema>;
+export type RecallAttempt = z.infer<typeof RecallAttemptSchema>;
 export type ResearchState = z.infer<typeof ResearchStateSchema>;
 
 export type Outline = z.infer<typeof OutlineSchema>;

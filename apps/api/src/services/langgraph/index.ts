@@ -45,10 +45,12 @@ export {
   // Research nodes
   PaperDiscoveryNode,
   DiscoveryValidationNode,
+  RecallRecoveryNode,
   PaperSummarizeNode,
   PaperCompareNode,
   SynthesisNode,
   FinalWriterNode,
+  HaltNode,
   // Common nodes
   FailureHandlerNode,
   // Registry

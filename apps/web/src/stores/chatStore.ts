@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Message, ToolResult, Artifact } from '@mark/shared';
+import type { Message, ToolResult, Artifact, TableIR, TableIRSchema } from '@mark/shared';
 
 interface ToolCallStatus {
   toolCallId: string;
@@ -13,6 +13,26 @@ interface ToolCallStatus {
     total: number;
     message?: string;
   };
+}
+
+/**
+ * Streaming table state - represents a table that is still being streamed.
+ * Contains schema (known upfront) but may not have complete data.
+ */
+interface StreamingTableState {
+  tableId: string;
+  schema: TableIRSchema;
+  caption?: string;
+  isStreaming: true;
+}
+
+/**
+ * Completed table state - represents a fully streamed table.
+ */
+interface CompletedTableState {
+  tableId: string;
+  table: TableIR;
+  isStreaming: false;
 }
 
 interface ChatState {
@@ -30,6 +50,12 @@ interface ChatState {
 
   // File artifacts by session ID (for file.created events)
   files: Map<string, Artifact[]>;
+
+  // Table blocks state (by tableId)
+  // Streaming tables have schema but incomplete data
+  streamingTables: Map<string, StreamingTableState>;
+  // Completed tables have full TableIR data
+  completedTables: Map<string, CompletedTableState>;
 
   // Actions - Messages
   setMessages: (sessionId: string, messages: Message[]) => void;
@@ -54,6 +80,12 @@ interface ChatState {
   // Actions - Files
   addFileArtifact: (sessionId: string, artifact: Artifact) => void;
   clearFiles: (sessionId: string) => void;
+
+  // Actions - Table blocks
+  startTableBlock: (tableId: string, schema: TableIRSchema, caption?: string) => void;
+  completeTableBlock: (tableId: string, table: TableIR) => void;
+  getTableState: (tableId: string) => StreamingTableState | CompletedTableState | null;
+  clearTables: () => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -65,6 +97,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isThinking: false,
   toolCalls: new Map(),
   files: new Map(),
+  streamingTables: new Map(),
+  completedTables: new Map(),
 
   // Set messages for a session
   setMessages: (sessionId: string, messages: Message[]) => {
@@ -235,6 +269,60 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const newFiles = new Map(state.files);
       newFiles.delete(sessionId);
       return { files: newFiles };
+    });
+  },
+
+  // Start a table block (table.start event)
+  startTableBlock: (tableId: string, schema: TableIRSchema, caption?: string) => {
+    set((state) => {
+      const newStreamingTables = new Map(state.streamingTables);
+      newStreamingTables.set(tableId, {
+        tableId,
+        schema,
+        caption,
+        isStreaming: true,
+      });
+      return { streamingTables: newStreamingTables };
+    });
+  },
+
+  // Complete a table block (table.complete event)
+  completeTableBlock: (tableId: string, table: TableIR) => {
+    set((state) => {
+      // Remove from streaming tables
+      const newStreamingTables = new Map(state.streamingTables);
+      newStreamingTables.delete(tableId);
+
+      // Add to completed tables
+      const newCompletedTables = new Map(state.completedTables);
+      newCompletedTables.set(tableId, {
+        tableId,
+        table,
+        isStreaming: false,
+      });
+
+      return {
+        streamingTables: newStreamingTables,
+        completedTables: newCompletedTables,
+      };
+    });
+  },
+
+  // Get table state by ID (for rendering)
+  getTableState: (tableId: string) => {
+    const state = get();
+    return (
+      state.completedTables.get(tableId) ||
+      state.streamingTables.get(tableId) ||
+      null
+    );
+  },
+
+  // Clear all tables (on stream end or session change)
+  clearTables: () => {
+    set({
+      streamingTables: new Map(),
+      completedTables: new Map(),
     });
   },
 }));
