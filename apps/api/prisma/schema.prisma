@@ -19,6 +19,8 @@ model User {
   apiKeys      ApiKey[]
   feedback     Feedback[]
   oauthAccounts OAuthAccount[]
+  externalSkills UserExternalSkill[]
+  externalSkillExecutions ExternalSkillExecution[]
 
   @@map("users")
 }
@@ -145,7 +147,10 @@ model ExternalSkill {
   name              String
   description       String
   version           String
+  contractVersion   String?             @map("contract_version")
   status            SkillStatus         @default(ACTIVE)
+  lifecycleStatus   String?             @map("lifecycle_status")
+  reviewedAt        DateTime?           @map("reviewed_at")
   category          String?
   inputSchema       Json?               @map("input_schema")
   outputSchema      Json?               @map("output_schema")
@@ -159,6 +164,8 @@ model ExternalSkill {
 
   sources           ExternalSkillSource[]
   mergedFrom        String[]            @map("merged_from")
+  userSkills        UserExternalSkill[]
+  executions        ExternalSkillExecution[]
 
   isProtected       Boolean             @default(false) @map("is_protected")
   protectionReason  String?             @map("protection_reason")
@@ -170,6 +177,58 @@ model ExternalSkill {
   @@index([status])
   @@index([capabilityLevel])
   @@map("external_skills")
+}
+
+model UserExternalSkill {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  canonicalId  String   @map("canonical_id")
+  enabled      Boolean  @default(true)
+  customConfig Json?    @map("custom_config")
+  enabledAt    DateTime @default(now()) @map("enabled_at")
+  disabledAt   DateTime? @map("disabled_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill        ExternalSkill @relation(fields: [canonicalId], references: [canonicalId], onDelete: Cascade)
+
+  @@unique([userId, canonicalId])
+  @@index([userId])
+  @@index([canonicalId])
+  @@map("user_external_skills")
+}
+
+model ExternalSkillExecution {
+  id                String   @id @default(cuid())
+  canonicalId       String   @map("canonical_id")
+  userId            String?  @map("user_id")
+  sessionId         String?  @map("session_id")
+  traceId           String   @map("trace_id")
+  parentExecutionId String?  @map("parent_execution_id")
+  input             Json
+  parameters        Json     @default("{}")
+  output            Json?
+  status            String
+  errorType         String?  @map("error_type")
+  errorMessage      String?  @map("error_message")
+  executionTimeMs   Int?     @map("execution_time_ms")
+  tokensUsed        Int?     @map("tokens_used")
+  toolsUsed         String[] @map("tools_used")
+  policySnapshot    Json?    @map("policy_snapshot")
+  startedAt         DateTime @default(now()) @map("started_at")
+  completedAt       DateTime? @map("completed_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  skill             ExternalSkill @relation(fields: [canonicalId], references: [canonicalId])
+  user              User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([canonicalId, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([traceId])
+  @@index([sessionId])
+  @@map("external_skill_executions")
 }
 
 model ExternalSkillSource {

@@ -497,3 +497,8 @@ export interface TableCompleteEventData {
   /** Complete Table IR data */
   table: TableIR;
 }
+
+// ============ External Skill Contract ============
+export * from './external-skill-contract';
+export * from './contract-validator';
+export * from './execution-context';

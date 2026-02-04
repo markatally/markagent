@@ -22,7 +22,7 @@ export class ExternalSkillAdapter {
       systemPrompt: external.systemPrompt || this.generateDefaultSystemPrompt(external),
       userPromptTemplate:
         external.userPromptTemplate || this.generateDefaultUserPrompt(external),
-      requiredTools: external.requiredTools || this.inferRequiredTools(external),
+      requiredTools: this.normalizeRequiredTools(external) || this.inferRequiredTools(external),
       parameters: this.convertInputSchema(external),
     };
   }
@@ -36,14 +36,14 @@ export class ExternalSkillAdapter {
       return false;
     }
 
-    // Must have either system prompt or function definition
-    if (!external.systemPrompt && !external.functionDefinition) {
+    // Must have valid invocation pattern
+    const validPatterns = ['prompt', 'function', 'workflow', 'mcp'];
+    const kind = this.resolveKind(external);
+    if (!validPatterns.includes(kind)) {
       return false;
     }
 
-    // Must have valid invocation pattern
-    const validPatterns = ['prompt', 'function', 'workflow', 'mcp'];
-    if (!validPatterns.includes(external.invocationPattern)) {
+    if (kind === 'function' && !external.functionDefinition) {
       return false;
     }
 
@@ -99,6 +99,7 @@ export class ExternalSkillAdapter {
    * Generate default system prompt if not provided
    */
   private generateDefaultSystemPrompt(external: UnifiedSkill): string {
+    const kind = this.resolveKind(external);
     return `You are executing the "${external.name}" skill.
 
 Description: ${external.description}
@@ -111,7 +112,7 @@ Follow these guidelines:
 
 Skill metadata:
 - Version: ${external.version}
-- Invocation pattern: ${external.invocationPattern}
+- Invocation pattern: ${kind}
 - Capability level: ${external.capabilityLevel}`;
   }
 
@@ -135,9 +136,10 @@ Please provide a detailed response.`;
    */
   private inferRequiredTools(external: UnifiedSkill): string[] {
     const tools: string[] = [];
+    const kind = this.resolveKind(external);
 
     // Based on invocation pattern
-    switch (external.invocationPattern) {
+    switch (kind) {
       case 'prompt':
         // Prompt-based skills typically need basic tools
         tools.push('file_reader');
@@ -205,6 +207,15 @@ Please provide a detailed response.`;
     }
 
     return params;
+  }
+
+  private resolveKind(external: UnifiedSkill): 'prompt' | 'function' | 'workflow' | 'mcp' {
+    return external.kind ?? external.invocationPattern ?? 'prompt';
+  }
+
+  private normalizeRequiredTools(external: UnifiedSkill): string[] | undefined {
+    if (!external.requiredTools) return undefined;
+    return external.requiredTools.map((tool) => (typeof tool === 'string' ? tool : tool.name));
   }
 
   /**

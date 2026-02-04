@@ -105,6 +105,9 @@
     "packages/shared": {
       "name": "@mark/shared",
       "version": "0.1.0",
+      "dependencies": {
+        "semver": "^7.7.3",
+      },
       "devDependencies": {
         "@types/node": "^25.1.0",
         "typescript": "^5.3.0",

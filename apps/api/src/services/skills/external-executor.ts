@@ -1,351 +1,174 @@
 /**
- * External Skill Executor
- * Handles execution of external skills based on their invocation pattern
+ * External Skill Orchestrator (Policy-Driven Runtime)
  */
 
+import { randomUUID } from 'crypto';
+import type { ExecutionContext, UserTier } from '@mark/shared';
+import { ContractVersionValidator, createExecutionContext } from '@mark/shared';
 import type { UnifiedSkill } from '../external-skills/types';
+import { ExecutionPolicyResolver } from './policy-resolver';
+import { ExecutionLogger } from './execution-logger';
+import { createTraceContext } from './tracing';
+import {
+  FunctionRuntime,
+  MCPRuntime,
+  PromptRuntime,
+  WorkflowRuntime,
+  getRuntimeRegistry,
+  type RuntimeResult,
+} from './runtimes';
 
-export interface ExecutionContext {
-  userId?: string;
+export interface ExecutionContextInput {
+  traceId?: string;
+  parentExecutionId?: string;
   sessionId?: string;
+  userId?: string;
+  userTier?: UserTier;
   workspaceId?: string;
   workspaceFiles?: string[];
-  additionalContext?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ExecutionResult {
   success: boolean;
-  output?: any;
+  output?: unknown;
+  rawOutput?: string;
+  normalizedOutput?: unknown;
   error?: string;
+  errorType?: string;
   executionTimeMs: number;
   metadata?: {
     invocationPattern: string;
     skillId: string;
+    traceId?: string;
     toolsUsed?: string[];
+    retryCount?: number;
   };
 }
 
-/**
- * Base interface for skill executors
- */
-export interface SkillExecutor {
-  canHandle(skill: UnifiedSkill): boolean;
-  execute(
-    skill: UnifiedSkill,
-    input: string,
-    parameters: Record<string, any>,
-    context: ExecutionContext
-  ): Promise<ExecutionResult>;
-}
-
-/**
- * Executor for prompt-based skills
- */
-export class PromptSkillExecutor implements SkillExecutor {
-  canHandle(skill: UnifiedSkill): boolean {
-    return skill.invocationPattern === 'prompt';
-  }
-
-  async execute(
-    skill: UnifiedSkill,
-    input: string,
-    parameters: Record<string, any>,
-    context: ExecutionContext
-  ): Promise<ExecutionResult> {
-    const startTime = Date.now();
-
-    try {
-      // Build the full prompt context
-      const systemPrompt = skill.systemPrompt || this.generateDefaultSystemPrompt(skill);
-      const userPrompt = this.formatUserPrompt(skill, input, parameters, context);
-
-      // In a real implementation, this would call your LLM service
-      // For now, we return a structured result that can be processed
-      const result = {
-        systemPrompt,
-        userPrompt,
-        parameters,
-        context,
-        // This would be the actual LLM response
-        response: null,
-      };
-
-      return {
-        success: true,
-        output: result,
-        executionTimeMs: Date.now() - startTime,
-        metadata: {
-          invocationPattern: 'prompt',
-          skillId: skill.canonicalId,
-          toolsUsed: skill.requiredTools || [],
-        },
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        executionTimeMs: Date.now() - startTime,
-        metadata: {
-          invocationPattern: 'prompt',
-          skillId: skill.canonicalId,
-        },
-      };
-    }
-  }
-
-  private generateDefaultSystemPrompt(skill: UnifiedSkill): string {
-    return `You are executing the "${skill.name}" skill. ${skill.description}`;
-  }
-
-  private formatUserPrompt(
-    skill: UnifiedSkill,
-    input: string,
-    parameters: Record<string, any>,
-    context: ExecutionContext
-  ): string {
-    let template = skill.userPromptTemplate || '{userInput}';
-
-    // Build template context
-    const templateContext: Record<string, string> = {
-      userInput: input,
-      workspaceFiles: context.workspaceFiles?.join(', ') || '(none)',
-      ...parameters,
-      ...context.additionalContext,
-    };
-
-    // Replace template variables
-    for (const [key, value] of Object.entries(templateContext)) {
-      template = template.replace(new RegExp(`\\{${key}\\}`, 'g'), String(value || ''));
-    }
-
-    // Clean up any remaining template variables
-    template = template.replace(/\{[^}]+\}/g, '');
-
-    return template.trim();
-  }
-}
-
-/**
- * Executor for function-based skills
- */
-export class FunctionSkillExecutor implements SkillExecutor {
-  canHandle(skill: UnifiedSkill): boolean {
-    return skill.invocationPattern === 'function' && !!skill.functionDefinition;
-  }
-
-  async execute(
-    skill: UnifiedSkill,
-    input: string,
-    parameters: Record<string, any>,
-    context: ExecutionContext
-  ): Promise<ExecutionResult> {
-    const startTime = Date.now();
-
-    try {
-      // In a real implementation, this would:
-      // 1. Parse the function definition
-      // 2. Create a sandboxed execution environment
-      // 3. Execute the function with parameters
-      // 4. Return the result
-
-      // For now, return a placeholder
-      return {
-        success: true,
-        output: {
-          message: 'Function execution not yet implemented',
-          functionDefinition: skill.functionDefinition,
-          parameters,
-        },
-        executionTimeMs: Date.now() - startTime,
-        metadata: {
-          invocationPattern: 'function',
-          skillId: skill.canonicalId,
-        },
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        executionTimeMs: Date.now() - startTime,
-        metadata: {
-          invocationPattern: 'function',
-          skillId: skill.canonicalId,
-        },
-      };
-    }
-  }
-}
-
-/**
- * Executor for workflow-based skills
- */
-export class WorkflowSkillExecutor implements SkillExecutor {
-  canHandle(skill: UnifiedSkill): boolean {
-    return skill.invocationPattern === 'workflow';
-  }
-
-  async execute(
-    skill: UnifiedSkill,
-    input: string,
-    parameters: Record<string, any>,
-    context: ExecutionContext
-  ): Promise<ExecutionResult> {
-    const startTime = Date.now();
-
-    try {
-      // In a real implementation, this would:
-      // 1. Parse the workflow definition
-      // 2. Execute each step sequentially
-      // 3. Pass context between steps
-      // 4. Handle errors and rollbacks
-
-      return {
-        success: true,
-        output: {
-          message: 'Workflow execution not yet implemented',
-          parameters,
-        },
-        executionTimeMs: Date.now() - startTime,
-        metadata: {
-          invocationPattern: 'workflow',
-          skillId: skill.canonicalId,
-        },
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        executionTimeMs: Date.now() - startTime,
-        metadata: {
-          invocationPattern: 'workflow',
-          skillId: skill.canonicalId,
-        },
-      };
-    }
-  }
-}
-
-/**
- * Executor for MCP-based skills
- */
-export class MCPSkillExecutor implements SkillExecutor {
-  canHandle(skill: UnifiedSkill): boolean {
-    return skill.invocationPattern === 'mcp';
-  }
-
-  async execute(
-    skill: UnifiedSkill,
-    input: string,
-    parameters: Record<string, any>,
-    context: ExecutionContext
-  ): Promise<ExecutionResult> {
-    const startTime = Date.now();
-
-    try {
-      // In a real implementation, this would:
-      // 1. Connect to the MCP server
-      // 2. Invoke the appropriate tool/resource
-      // 3. Handle streaming responses
-      // 4. Return the result
-
-      return {
-        success: true,
-        output: {
-          message: 'MCP execution not yet implemented',
-          parameters,
-        },
-        executionTimeMs: Date.now() - startTime,
-        metadata: {
-          invocationPattern: 'mcp',
-          skillId: skill.canonicalId,
-        },
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        executionTimeMs: Date.now() - startTime,
-        metadata: {
-          invocationPattern: 'mcp',
-          skillId: skill.canonicalId,
-        },
-      };
-    }
-  }
-}
-
-/**
- * Orchestrator that routes skills to appropriate executors
- */
 export class ExternalSkillOrchestrator {
-  private executors: SkillExecutor[];
+  private runtimeRegistry = getRuntimeRegistry();
+  private policyResolver = new ExecutionPolicyResolver();
+  private executionLogger = new ExecutionLogger();
 
   constructor() {
-    this.executors = [
-      new PromptSkillExecutor(),
-      new FunctionSkillExecutor(),
-      new WorkflowSkillExecutor(),
-      new MCPSkillExecutor(),
-    ];
+    this.ensureRuntime(new PromptRuntime());
+    this.ensureRuntime(new FunctionRuntime());
+    this.ensureRuntime(new WorkflowRuntime());
+    this.ensureRuntime(new MCPRuntime());
   }
 
-  /**
-   * Execute an external skill
-   */
+  private ensureRuntime(runtime: PromptRuntime | FunctionRuntime | WorkflowRuntime | MCPRuntime) {
+    if (!this.runtimeRegistry.get(runtime.kind)) {
+      this.runtimeRegistry.register(runtime);
+    }
+  }
+
   async execute(
     skill: UnifiedSkill,
     input: string,
-    parameters: Record<string, any> = {},
-    context: ExecutionContext = {}
+    parameters: Record<string, unknown> = {},
+    contextInput: ExecutionContextInput = {}
   ): Promise<ExecutionResult> {
-    // Find appropriate executor
-    const executor = this.executors.find((e) => e.canHandle(skill));
+    ContractVersionValidator.validateAtRuntime(skill);
+    const skillKind = skill.kind ?? skill.invocationPattern ?? 'prompt';
 
-    if (!executor) {
-      return {
-        success: false,
-        error: `No executor found for invocation pattern: ${skill.invocationPattern}`,
-        executionTimeMs: 0,
-        metadata: {
-          invocationPattern: skill.invocationPattern,
-          skillId: skill.canonicalId,
-        },
-      };
-    }
-
-    // Validate skill status
     if (skill.status && skill.status !== 'ACTIVE') {
       return {
         success: false,
         error: `Skill is not active: ${skill.status}`,
         executionTimeMs: 0,
         metadata: {
-          invocationPattern: skill.invocationPattern,
+          invocationPattern: skillKind,
           skillId: skill.canonicalId,
         },
       };
     }
 
-    // Execute
-    return executor.execute(skill, input, parameters, context);
+    const policy = this.policyResolver.resolve(skill, {
+      userId: contextInput.userId,
+      sessionId: contextInput.sessionId,
+      userTier: contextInput.userTier,
+    });
+    const allowedTools = this.policyResolver.resolveAllowedTools(skill, policy);
+
+    const traceContext = createTraceContext({
+      traceId: contextInput.traceId || randomUUID(),
+      parentExecutionId: contextInput.parentExecutionId,
+      sessionId: contextInput.sessionId,
+      userId: contextInput.userId,
+    });
+
+    const executionContext: ExecutionContext = createExecutionContext({
+      traceId: traceContext.traceId,
+      parentExecutionId: traceContext.parentExecutionId,
+      sessionId: traceContext.sessionId,
+      userId: traceContext.userId,
+      userTier: contextInput.userTier,
+      resolvedPolicy: policy,
+      allowedTools,
+      workspaceId: contextInput.workspaceId,
+      workspaceFiles: contextInput.workspaceFiles,
+      metadata: contextInput.metadata,
+    });
+
+    const runtime = this.runtimeRegistry.get(skillKind);
+    if (!runtime) {
+      return {
+        success: false,
+        error: `No runtime registered for skill kind: ${skillKind}`,
+        executionTimeMs: 0,
+        metadata: {
+          invocationPattern: skillKind,
+          skillId: skill.canonicalId,
+        },
+      };
+    }
+
+    const result = await runtime.run(skill, input, parameters, executionContext);
+    await this.executionLogger.logExecution(
+      skill,
+      input,
+      parameters,
+      result,
+      executionContext,
+      policy
+    );
+
+    return this.formatResult(skill, skillKind, result, executionContext);
   }
 
-  /**
-   * Check if skill can be executed
-   */
+  private formatResult(
+    skill: UnifiedSkill,
+    skillKind: string,
+    result: RuntimeResult,
+    context: ExecutionContext
+  ): ExecutionResult {
+    return {
+      success: result.success,
+      output: result.output,
+      rawOutput: result.rawOutput,
+      normalizedOutput: result.normalizedOutput,
+      error: result.error?.message,
+      errorType: result.error?.type,
+      executionTimeMs: result.metrics.executionTimeMs,
+      metadata: {
+        invocationPattern: skillKind,
+        skillId: skill.canonicalId,
+        traceId: context.traceId,
+        toolsUsed: [...result.metrics.toolsUsed],
+        retryCount: result.metrics.retryCount,
+      },
+    };
+  }
+
   canExecute(skill: UnifiedSkill): boolean {
-    return this.executors.some((e) => e.canHandle(skill));
+    return !!this.runtimeRegistry.get(skill.kind);
   }
 }
 
-/**
- * Singleton instance
- */
 let orchestratorInstance: ExternalSkillOrchestrator | null = null;
 
-/**
- * Get the external skill orchestrator instance
- */
 export function getExternalSkillOrchestrator(): ExternalSkillOrchestrator {
   if (!orchestratorInstance) {
     orchestratorInstance = new ExternalSkillOrchestrator();

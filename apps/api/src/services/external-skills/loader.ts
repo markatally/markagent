@@ -4,6 +4,7 @@ import { prisma } from '../prisma';
 import { SkillProtectionEnforcer } from './protection';
 import { SkillSnapshotManager } from './snapshot';
 import type { SkillFilter, SkillSnapshot, UnifiedSkill } from './types';
+import { CONTRACT_VERSION } from '@mark/shared';
 
 const ROOT_DIR = process.cwd().endsWith(path.join('apps', 'api'))
   ? path.resolve(process.cwd(), 'external-skills')
@@ -39,7 +40,7 @@ class ExternalSkillLoader {
     if (!record) return null;
     const filePath = path.join(ROOT_DIR, record.filePath);
     const raw = await readFile(filePath, 'utf8');
-    return JSON.parse(raw) as UnifiedSkill;
+    return normalizeLegacySkill(JSON.parse(raw) as UnifiedSkill);
   }
 
   async listSkills(filter?: SkillFilter): Promise<UnifiedSkill[]> {
@@ -51,7 +52,7 @@ class ExternalSkillLoader {
     for (const record of records) {
       const filePath = path.join(ROOT_DIR, record.filePath);
       const raw = await readFile(filePath, 'utf8');
-      skills.push(JSON.parse(raw) as UnifiedSkill);
+      skills.push(normalizeLegacySkill(JSON.parse(raw) as UnifiedSkill));
     }
 
     if (!filter) return skills;
@@ -83,3 +84,51 @@ export function getExternalSkillLoader(): ExternalSkillLoader {
 }
 
 export { ExternalSkillLoader };
+
+function normalizeLegacySkill(skill: UnifiedSkill): UnifiedSkill {
+  const updated = { ...skill };
+
+  if (!updated.contractVersion) {
+    updated.contractVersion = CONTRACT_VERSION;
+  }
+
+  if (!updated.kind && updated.invocationPattern) {
+    updated.kind = updated.invocationPattern;
+  }
+
+  const sourceInfoCandidate = (updated as unknown as { source?: unknown }).source;
+  if (!updated.sourceInfo && sourceInfoCandidate && typeof sourceInfoCandidate === 'object') {
+    const legacySource = sourceInfoCandidate as {
+      repoUrl?: string;
+      repoPath?: string;
+      commitHash?: string;
+      license?: string;
+      syncedAt?: string | Date;
+    };
+    updated.sourceInfo = {
+      repoUrl: legacySource.repoUrl,
+      repoPath: legacySource.repoPath,
+      commitHash: legacySource.commitHash,
+      license: legacySource.license,
+      syncedAt: legacySource.syncedAt ? new Date(legacySource.syncedAt) : new Date(),
+    };
+  }
+
+  if (!updated.source && updated.sourceInfo?.repoUrl) {
+    updated.source = updated.sourceInfo.repoUrl.includes('github.com') ? 'github' : 'internal';
+  }
+
+  if (!updated.lifecycle) {
+    updated.lifecycle = { status: 'active' };
+  }
+
+  if (!updated.inputSchema) {
+    updated.inputSchema = { type: 'object', properties: {} };
+  }
+
+  if (!updated.outputSchema) {
+    updated.outputSchema = { type: 'string' };
+  }
+
+  return updated;
+}

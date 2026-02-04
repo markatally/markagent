@@ -77,15 +77,16 @@ export class LLMClient {
    */
   async chat(
     messages: LLMMessage[],
-    tools?: ChatCompletionTool[]
+    tools?: ChatCompletionTool[],
+    options?: { maxTokens?: number; temperature?: number }
   ): Promise<LLMResponse> {
     const response = await this.client.chat.completions.create({
       model: this.config.model,
       messages: messages as ChatCompletionMessageParam[],
       tools,
       tool_choice: tools && tools.length > 0 ? 'auto' : undefined,
-      max_tokens: this.config.maxTokens,
-      temperature: this.config.temperature,
+      max_tokens: options?.maxTokens ?? this.config.maxTokens,
+      temperature: options?.temperature ?? this.config.temperature,
       stream: false,
     });
 

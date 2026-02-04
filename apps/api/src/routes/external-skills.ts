@@ -70,13 +70,14 @@ app.get('/', async (c) => {
         description: skill.description,
         category: skill.category,
         version: skill.version,
-        invocationPattern: skill.invocationPattern,
+        contractVersion: skill.contractVersion,
+        invocationPattern: skill.kind ?? skill.invocationPattern,
         capabilityLevel: skill.capabilityLevel,
         executionScope: skill.executionScope,
         isProtected: skill.isProtected,
         source: {
-          repoUrl: skill.source.repoUrl,
-          repoPath: skill.source.repoPath,
+          repoUrl: skill.sourceInfo?.repoUrl,
+          repoPath: skill.sourceInfo?.repoPath,
         },
         enabled: processor['registry'].isExternalEnabled(skill.canonicalId),
       })),
@@ -231,8 +232,8 @@ app.post('/:canonicalId/execute', async (c) => {
             canonicalId: skill.canonicalId,
             version: skill.version,
             capabilityLevel: skill.capabilityLevel,
-            invocationPattern: skill.invocationPattern,
-            source: skill.source,
+            invocationPattern: skill.kind ?? skill.invocationPattern,
+            source: skill.sourceInfo,
           },
         },
         userInput: validated.input,
@@ -244,6 +245,7 @@ app.post('/:canonicalId/execute', async (c) => {
         workspaceId: validated.context?.workspaceId,
         workspaceFiles: validated.context?.workspaceFiles,
         additionalContext: validated.context?.additionalContext,
+        metadata: validated.context?.additionalContext,
       }
     );
 
@@ -379,4 +381,5 @@ app.post('/search', async (c) => {
   }
 });
 
+export const externalSkillRoutes = app;
 export default app;

@@ -1,3 +1,4 @@
+import { CONTRACT_VERSION } from '@mark/shared';
 import type { UnifiedSkill, SkillSourceInfo } from './types';
 
 export interface RawSkillDescriptor {
@@ -94,15 +95,21 @@ function baseSkill(
 ): UnifiedSkill {
   const canonicalId = deriveCanonicalId(overrides.name || 'external-skill');
   return {
+    contractVersion: CONTRACT_VERSION,
     canonicalId,
+    kind: resolveSkillKind(overrides),
+    source: resolveSkillSource(descriptor.source),
     name: overrides.name || 'external-skill',
     description: overrides.description || 'External skill',
     version: overrides.version || '0.0.0',
     runtimeVersion: overrides.runtimeVersion,
     category: overrides.category,
     status: overrides.status || 'ACTIVE',
-    inputSchema: overrides.inputSchema,
-    outputSchema: overrides.outputSchema,
+    lifecycle: {
+      status: resolveLifecycleStatus(overrides.status),
+    },
+    inputSchema: overrides.inputSchema || { type: 'object', properties: {} },
+    outputSchema: overrides.outputSchema || { type: 'string' },
     invocationPattern: overrides.invocationPattern || 'prompt',
     systemPrompt: overrides.systemPrompt,
     userPromptTemplate: overrides.userPromptTemplate,
@@ -111,7 +118,12 @@ function baseSkill(
     requiredTools: overrides.requiredTools,
     capabilityLevel: overrides.capabilityLevel || 'EXTERNAL',
     executionScope: overrides.executionScope || 'AGENT',
-    source: descriptor.source,
+    sourceInfo: {
+      repoUrl: descriptor.source.repoUrl,
+      repoPath: descriptor.source.repoPath,
+      commitHash: descriptor.source.commitHash,
+      syncedAt: descriptor.source.syncedAt,
+    },
     isProtected: overrides.isProtected ?? false,
     protectionReason: overrides.protectionReason,
   };
@@ -152,6 +164,26 @@ function deriveCanonicalId(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
+}
+
+function resolveSkillKind(overrides: Partial<UnifiedSkill>): UnifiedSkill['kind'] {
+  if (overrides.kind) return overrides.kind;
+  if (overrides.invocationPattern) return overrides.invocationPattern;
+  return 'prompt';
+}
+
+function resolveSkillSource(source: SkillSourceInfo): UnifiedSkill['source'] {
+  if (source.repoUrl?.includes('github.com')) return 'github';
+  if (source.repoUrl?.includes('mcp')) return 'mcp';
+  return 'internal';
+}
+
+function resolveLifecycleStatus(
+  status: UnifiedSkill['status']
+): UnifiedSkill['lifecycle']['status'] {
+  if (status === 'DEPRECATED') return 'deprecated';
+  if (status === 'PROTECTED') return 'review';
+  return 'active';
 }
 
 function stringValue(value: unknown): string | undefined {

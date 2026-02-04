@@ -1,4 +1,4 @@
-import type { JSONSchema } from '@mark/shared';
+import type { JSONSchema, ExternalSkillContract } from '@mark/shared';
 
 export type CapabilityLevel = 'EXTERNAL' | 'INTERNAL' | 'PRODUCT';
 export type ExecutionScope = 'SYSTEM' | 'AGENT' | 'USER_VISIBLE';
@@ -11,32 +11,20 @@ export interface SkillSourceInfo {
   syncedAt: Date;
 }
 
-export interface UnifiedSkill {
-  canonicalId: string;
-  name: string;
-  description: string;
-  version: string;
+export interface UnifiedSkill extends ExternalSkillContract {
   runtimeVersion?: string;
-  category?: string;
   status?: 'ACTIVE' | 'EXTENDED' | 'DEPRECATED' | 'PROTECTED';
-
-  inputSchema?: JSONSchema;
-  outputSchema?: JSONSchema;
-
-  invocationPattern: 'function' | 'prompt' | 'workflow' | 'mcp';
-  systemPrompt?: string;
-  userPromptTemplate?: string;
+  invocationPattern?: 'function' | 'prompt' | 'workflow' | 'mcp';
   functionDefinition?: Record<string, unknown>;
-
   dependencies: string[];
   requiredTools?: string[];
-
   capabilityLevel: CapabilityLevel;
   executionScope: ExecutionScope;
-
-  source: SkillSourceInfo;
+  sourceInfo: SkillSourceInfo;
   isProtected: boolean;
   protectionReason?: string;
+  inputSchema?: JSONSchema;
+  outputSchema?: JSONSchema;
 }
 
 export interface SkillFilter {

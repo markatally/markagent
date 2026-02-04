@@ -99,8 +99,8 @@ export async function runSync(): Promise<void> {
     const canonicalSkill = { ...skill, canonicalId };
     await writeCanonicalSkill(canonicalSkill);
 
-    if (skill.source) {
-      const sourceKey = `${skill.source.repoUrl}:${skill.source.repoPath}`;
+    if (skill.sourceInfo) {
+      const sourceKey = `${skill.sourceInfo.repoUrl}:${skill.sourceInfo.repoPath}`;
       mappings[sourceKey] = canonicalId;
     }
 
@@ -110,11 +110,14 @@ export async function runSync(): Promise<void> {
         name: canonicalSkill.name,
         description: canonicalSkill.description,
         version: canonicalSkill.version,
+        contractVersion: canonicalSkill.contractVersion,
         runtimeVersion: canonicalSkill.runtimeVersion ?? canonicalSkill.version,
+        lifecycleStatus: canonicalSkill.lifecycle?.status,
+        reviewedAt: canonicalSkill.lifecycle?.reviewedAt ?? undefined,
         category: canonicalSkill.category,
         inputSchema: canonicalSkill.inputSchema ?? undefined,
         outputSchema: canonicalSkill.outputSchema ?? undefined,
-        invocationPattern: canonicalSkill.invocationPattern,
+        invocationPattern: canonicalSkill.kind,
         dependencies: canonicalSkill.dependencies,
         filePath: path.relative(ROOT_DIR, canonicalPath(canonicalSkill.canonicalId)),
         capabilityLevel: canonicalSkill.capabilityLevel,
@@ -130,11 +133,14 @@ export async function runSync(): Promise<void> {
         name: canonicalSkill.name,
         description: canonicalSkill.description,
         version: canonicalSkill.version,
+        contractVersion: canonicalSkill.contractVersion,
         runtimeVersion: canonicalSkill.runtimeVersion ?? canonicalSkill.version,
+        lifecycleStatus: canonicalSkill.lifecycle?.status,
+        reviewedAt: canonicalSkill.lifecycle?.reviewedAt ?? undefined,
         category: canonicalSkill.category,
         inputSchema: canonicalSkill.inputSchema ?? undefined,
         outputSchema: canonicalSkill.outputSchema ?? undefined,
-        invocationPattern: canonicalSkill.invocationPattern,
+        invocationPattern: canonicalSkill.kind,
         dependencies: canonicalSkill.dependencies,
         filePath: path.relative(ROOT_DIR, canonicalPath(canonicalSkill.canonicalId)),
         capabilityLevel: canonicalSkill.capabilityLevel,
@@ -214,7 +220,7 @@ function isSkillFile(fileName: string): boolean {
 }
 
 async function writeSourceSkill(skill: UnifiedSkill): Promise<void> {
-  const sourceDir = path.join(SOURCES_DIR, repoDirName(skill.source.repoUrl));
+  const sourceDir = path.join(SOURCES_DIR, repoDirName(skill.sourceInfo.repoUrl));
   await mkdir(sourceDir, { recursive: true });
   const target = path.join(sourceDir, `${skill.canonicalId}.json`);
   await writeFile(target, JSON.stringify(skill, null, 2));

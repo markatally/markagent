@@ -19,15 +19,21 @@ describe('External Skill Loader', () => {
     await writeFile(
       testFilePath,
       JSON.stringify({
+        contractVersion: '1.0.0',
         canonicalId: testSkillId,
+        kind: 'prompt',
+        source: 'github',
         name: 'Test Loader Skill',
         description: 'A test skill for loader',
         version: '1.0.0',
+        inputSchema: { type: 'object', properties: {} },
+        outputSchema: { type: 'object', properties: {} },
+        lifecycle: { status: 'active' },
         invocationPattern: 'prompt',
         dependencies: [],
         capabilityLevel: 'EXTERNAL',
         executionScope: 'AGENT',
-        source: {
+        sourceInfo: {
           repoUrl: 'https://github.com/test/repo',
           repoPath: 'test.md',
           syncedAt: new Date().toISOString(),

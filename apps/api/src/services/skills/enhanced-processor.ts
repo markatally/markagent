@@ -6,7 +6,7 @@
 import { SkillProcessor, type SkillInvocation } from './processor';
 import { getDynamicSkillRegistry, type EnhancedSkill } from './dynamic-registry';
 import { getExternalSkillLoader } from '../external-skills/loader';
-import { getExternalSkillOrchestrator, type ExecutionContext } from './external-executor';
+import { getExternalSkillOrchestrator, type ExecutionContextInput } from './external-executor';
 import type { UnifiedSkill } from '../external-skills/types';
 
 /**
@@ -16,6 +16,10 @@ export interface EnhancedSkillInvocation extends Omit<SkillInvocation, 'skill'> 
   skill: EnhancedSkill;
   isExternal: boolean;
   externalSkill?: UnifiedSkill;
+}
+
+export interface SkillProcessorContext extends ExecutionContextInput {
+  additionalContext?: Record<string, string>;
 }
 
 /**
@@ -87,7 +91,7 @@ export class EnhancedSkillProcessor extends SkillProcessor {
    */
   async executeInvocation(
     invocation: EnhancedSkillInvocation,
-    context: ExecutionContext = {}
+    context: SkillProcessorContext = {}
   ): Promise<any> {
     if (!invocation.isExternal || !invocation.externalSkill) {
       // Regular product skill - use standard prompt formatting
@@ -103,7 +107,16 @@ export class EnhancedSkillProcessor extends SkillProcessor {
       invocation.externalSkill,
       invocation.userInput,
       invocation.parameters,
-      context
+      {
+        traceId: context.traceId,
+        parentExecutionId: context.parentExecutionId,
+        sessionId: context.sessionId,
+        userId: context.userId,
+        userTier: context.userTier,
+        workspaceId: context.workspaceId,
+        workspaceFiles: context.workspaceFiles,
+        metadata: context.metadata,
+      }
     );
   }
 

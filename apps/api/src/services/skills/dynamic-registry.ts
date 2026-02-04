@@ -3,6 +3,7 @@
  * Manages both static (product) skills and dynamic (external) skills
  */
 
+import { ContractVersionValidator } from '@mark/shared';
 import { getSkill, listSkills, type Skill } from '../../../../../skills';
 import { getExternalSkillLoader } from '../external-skills/loader';
 import { getExternalSkillAdapter } from './external-bridge';
@@ -13,6 +14,7 @@ export interface EnhancedSkill extends Skill {
   externalMetadata?: {
     canonicalId: string;
     version: string;
+    contractVersion?: string;
     capabilityLevel: string;
     invocationPattern: string;
     source: {
@@ -94,6 +96,11 @@ export class DynamicSkillRegistry {
       return false;
     }
 
+    const validation = ContractVersionValidator.validateAtRegistration(externalSkill);
+    if (!validation.valid) {
+      return false;
+    }
+
     this.enabledExternalSkills.add(canonicalId);
     await this.addToCache(externalSkill);
     return true;
@@ -157,7 +164,10 @@ export class DynamicSkillRegistry {
     // Load enabled external skills
     for (const canonicalId of this.enabledExternalSkills) {
       const externalSkill = await loader.getSkill(canonicalId);
-      if (externalSkill && adapter.canExecute(externalSkill)) {
+      if (!externalSkill) continue;
+      const validation = ContractVersionValidator.validateAtRegistration(externalSkill);
+      if (!validation.valid) continue;
+      if (adapter.canExecute(externalSkill)) {
         await this.addToCache(externalSkill);
       }
     }
@@ -178,11 +188,12 @@ export class DynamicSkillRegistry {
       externalMetadata: {
         canonicalId: externalSkill.canonicalId,
         version: externalSkill.version,
+        contractVersion: externalSkill.contractVersion,
         capabilityLevel: externalSkill.capabilityLevel,
-        invocationPattern: externalSkill.invocationPattern,
+        invocationPattern: externalSkill.kind,
         source: {
-          repoUrl: externalSkill.source.repoUrl,
-          repoPath: externalSkill.source.repoPath,
+          repoUrl: externalSkill.sourceInfo.repoUrl || '',
+          repoPath: externalSkill.sourceInfo.repoPath || '',
         },
       },
     };
