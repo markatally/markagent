@@ -1,0 +1,18 @@
+{
+  "canonicalId": "pptxgenjs-tutorial-extended-0-0-0",
+  "name": "PptxGenJS Tutorial",
+  "description": "```javascript",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/anthropics/skills.git",
+    "repoPath": "skills/pptx/pptxgenjs.md",
+    "syncedAt": "2026-02-04T10:44:51.210Z"
+  },
+  "isProtected": true,
+  "protectionReason": "PPT generation - existing implementation"
+}

@@ -7,7 +7,10 @@ import path from 'node:path';
 describe('External Skill Loader', () => {
   const loader = new ExternalSkillLoader();
   const testSkillId = 'test-loader-skill';
-  const testDir = path.resolve(process.cwd(), 'apps', 'api', 'external-skills', 'canonical', testSkillId);
+  const externalSkillsRoot = process.cwd().endsWith(path.join('apps', 'api'))
+    ? path.resolve(process.cwd(), 'external-skills')
+    : path.resolve(process.cwd(), 'apps', 'api', 'external-skills');
+  const testDir = path.join(externalSkillsRoot, 'canonical', testSkillId);
   const testFilePath = path.join(testDir, 'skill.json');
 
   beforeAll(async () => {
@@ -43,7 +46,7 @@ describe('External Skill Loader', () => {
         status: 'ACTIVE',
         invocationPattern: 'prompt',
         dependencies: [],
-        filePath: path.relative(path.resolve(process.cwd(), 'apps', 'api', 'external-skills'), testFilePath),
+        filePath: path.relative(externalSkillsRoot, testFilePath),
         capabilityLevel: 'EXTERNAL',
         executionScope: 'AGENT',
         isProtected: false,

@@ -11,7 +11,7 @@
   "source": {
     "repoUrl": "https://github.com/openai/skills",
     "repoPath": "skills/.curated/security-best-practices/references/python-django-web-server-security.md",
-    "syncedAt": "2026-02-04T10:29:38.530Z"
+    "syncedAt": "2026-02-04T10:44:53.210Z"
   },
   "isProtected": false
 }

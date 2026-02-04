@@ -3,7 +3,9 @@ import path from 'node:path';
 import { prisma } from '../prisma';
 import type { ResolvedSkill, SkillFilter, SkillSnapshot, UnifiedSkill } from './types';
 
-const ROOT_DIR = path.resolve(process.cwd(), 'apps', 'api', 'external-skills');
+const ROOT_DIR = process.cwd().endsWith(path.join('apps', 'api'))
+  ? path.resolve(process.cwd(), 'external-skills')
+  : path.resolve(process.cwd(), 'apps', 'api', 'external-skills');
 
 export class SkillSnapshotManager {
   private snapshots = new Map<string, SkillSnapshot>();

@@ -5,7 +5,9 @@ import { SkillProtectionEnforcer } from './protection';
 import { SkillSnapshotManager } from './snapshot';
 import type { SkillFilter, SkillSnapshot, UnifiedSkill } from './types';
 
-const ROOT_DIR = path.resolve(process.cwd(), 'apps', 'api', 'external-skills');
+const ROOT_DIR = process.cwd().endsWith(path.join('apps', 'api'))
+  ? path.resolve(process.cwd(), 'external-skills')
+  : path.resolve(process.cwd(), 'apps', 'api', 'external-skills');
 
 class ExternalSkillLoader {
   private snapshotManager: SkillSnapshotManager;
