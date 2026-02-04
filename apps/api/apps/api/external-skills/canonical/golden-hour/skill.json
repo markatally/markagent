@@ -1,0 +1,17 @@
+{
+  "canonicalId": "golden-hour",
+  "name": "Golden Hour",
+  "description": "A rich and warm autumnal palette that creates an inviting and sophisticated atmosphere.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/anthropics/skills.git",
+    "repoPath": "skills/theme-factory/themes/golden-hour.md",
+    "syncedAt": "2026-02-04T10:29:36.734Z"
+  },
+  "isProtected": false
+}

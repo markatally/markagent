@@ -1,0 +1,17 @@
+{
+  "canonicalId": "figma",
+  "name": "figma",
+  "description": "Use the Figma MCP server to fetch design context, screenshots, variables, and assets from Figma, and to translate Figma nodes into production code. Trigger when a task involves Figma URLs, node IDs, design-to-code implementation, or Figma MCP setup and troubleshooting.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/figma/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:38.535Z"
+  },
+  "isProtected": false
+}

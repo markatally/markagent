@@ -1,0 +1,17 @@
+{
+  "canonicalId": "terraform-argo-tf",
+  "name": "terraform/argo.tf",
+  "description": "**Note on Smart Shield Evolution:** Argo Smart Routing is being integrated into Smart Shield. Configuration methods below remain valid; Terraform and IaC patterns unchanged.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/argo-smart-routing/configuration.md",
+    "syncedAt": "2026-02-04T10:29:38.551Z"
+  },
+  "isProtected": false
+}

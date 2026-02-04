@@ -1,0 +1,17 @@
+{
+  "canonicalId": "vercel-deploy",
+  "name": "vercel-deploy",
+  "description": "Deploy applications and websites to Vercel using the bundled `scripts/deploy.sh` claimable-preview flow. Use when the user asks to deploy to Vercel, wants a preview URL, or says to push a project live on Vercel.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/vercel-deploy/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:38.565Z"
+  },
+  "isProtected": false
+}

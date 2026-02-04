@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-workflows",
+  "name": "Cloudflare Workflows",
+  "description": "Durable multi-step applications with automatic retries, state persistence, and long-running execution.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/workflows/README.md",
+    "syncedAt": "2026-02-04T10:29:38.549Z"
+  },
+  "isProtected": false
+}

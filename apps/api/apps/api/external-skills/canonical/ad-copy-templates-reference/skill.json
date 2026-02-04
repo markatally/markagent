@@ -1,0 +1,17 @@
+{
+  "canonicalId": "ad-copy-templates-reference",
+  "name": "Ad Copy Templates Reference",
+  "description": "Detailed formulas and templates for writing high-converting ad copy.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "skills/paid-ads/references/ad-copy-templates.md",
+    "syncedAt": "2026-02-04T10:29:39.447Z"
+  },
+  "isProtected": false
+}

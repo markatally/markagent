@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-deploy",
+  "name": "cloudflare-deploy",
+  "description": "Deploy applications and infrastructure to Cloudflare using Workers, Pages, and related platform services. Use when the user asks to deploy, host, publish, or set up a project on Cloudflare.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:38.565Z"
+  },
+  "isProtected": false
+}

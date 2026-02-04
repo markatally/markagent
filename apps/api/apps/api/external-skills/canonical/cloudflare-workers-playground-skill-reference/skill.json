@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-workers-playground-skill-reference",
+  "name": "Cloudflare Workers Playground Skill Reference",
+  "description": "Cloudflare Workers Playground is a browser-based sandbox for instantly experimenting with, testing, and deploying Cloudflare Workers without authentication or setup. This skill provides patterns, APIs, and best practices specifically for Workers Playground development.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/workers-playground/README.md",
+    "syncedAt": "2026-02-04T10:29:38.553Z"
+  },
+  "isProtected": false
+}

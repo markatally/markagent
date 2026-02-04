@@ -19,6 +19,7 @@
     "db:deploy": "cd apps/api && bunx prisma migrate deploy",
     "db:generate": "cd apps/api && bunx prisma generate",
     "db:studio": "cd apps/api && bunx prisma studio",
+    "sync:skills": "bun run apps/api/scripts/sync-skills.ts",
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cache-reserve-gotchas",
+  "name": "Cache Reserve Gotchas",
+  "description": "**Cause:** Asset is not cacheable, TTL < 10 hours, Content-Length header missing, or blocking headers present (Set-Cookie, Vary: *)",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/cache-reserve/gotchas.md",
+    "syncedAt": "2026-02-04T10:29:38.563Z"
+  },
+  "isProtected": false
+}

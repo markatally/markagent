@@ -1,0 +1,17 @@
+{
+  "canonicalId": "assetsignore",
+  "name": ".assetsignore",
+  "description": "Minimal configuration requires only `assets.directory`:",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/static-assets/configuration.md",
+    "syncedAt": "2026-02-04T10:29:38.554Z"
+  },
+  "isProtected": false
+}

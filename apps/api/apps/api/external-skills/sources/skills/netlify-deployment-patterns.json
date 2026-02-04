@@ -1,0 +1,17 @@
+{
+  "canonicalId": "netlify-deployment-patterns",
+  "name": "Netlify Deployment Patterns",
+  "description": "Common deployment scenarios and best practices for the Netlify skill.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/netlify-deploy/references/deployment-patterns.md",
+    "syncedAt": "2026-02-04T10:29:38.526Z"
+  },
+  "isProtected": false
+}

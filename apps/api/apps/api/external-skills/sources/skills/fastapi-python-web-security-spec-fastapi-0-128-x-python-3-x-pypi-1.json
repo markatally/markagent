@@ -1,0 +1,17 @@
+{
+  "canonicalId": "fastapi-python-web-security-spec-fastapi-0-128-x-python-3-x-pypi-1",
+  "name": "FastAPI (Python) Web Security Spec (FastAPI 0.128.x, Python 3.x) ([PyPI][1])",
+  "description": "This document is designed as a **security spec** that supports:",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/security-best-practices/references/python-fastapi-web-server-security.md",
+    "syncedAt": "2026-02-04T10:29:38.530Z"
+  },
+  "isProtected": false
+}

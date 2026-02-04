@@ -1,0 +1,17 @@
+{
+  "canonicalId": "netlify-toml-configuration-reference",
+  "name": "netlify.toml Configuration Reference",
+  "description": "Configuration file for Netlify builds and deployments.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/netlify-deploy/references/netlify-toml.md",
+    "syncedAt": "2026-02-04T10:29:38.527Z"
+  },
+  "isProtected": false
+}

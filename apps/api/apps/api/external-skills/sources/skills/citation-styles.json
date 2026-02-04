@@ -1,0 +1,17 @@
+{
+  "canonicalId": "citation-styles",
+  "name": "Citation Styles",
+  "description": "Always cite sources using Notion page mentions:",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/notion-research-documentation/reference/citations.md",
+    "syncedAt": "2026-02-04T10:29:38.533Z"
+  },
+  "isProtected": false
+}

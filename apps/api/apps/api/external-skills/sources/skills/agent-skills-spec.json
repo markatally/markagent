@@ -1,0 +1,17 @@
+{
+  "canonicalId": "agent-skills-spec",
+  "name": "Agent Skills Spec",
+  "description": "The spec is now located at <https://agentskills.io/specification>",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/anthropics/skills.git",
+    "repoPath": "spec/agent-skills-spec.md",
+    "syncedAt": "2026-02-04T10:29:36.733Z"
+  },
+  "isProtected": false
+}

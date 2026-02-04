@@ -1,0 +1,17 @@
+{
+  "canonicalId": "codex-wrapped",
+  "name": "\"codex-wrapped\"",
+  "description": "\"Generate a Codex Wrapped usage recap from local Codex logs, including last 30 days, last 7 days, and an all-time focus-hours callout. Use when the user asks for a usage summary, activity recap, or Codex Wrapped report.\"",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.experimental/wrapped/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:38.572Z"
+  },
+  "isProtected": false
+}

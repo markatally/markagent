@@ -1,0 +1,17 @@
+{
+  "canonicalId": "forest-canopy",
+  "name": "Forest Canopy",
+  "description": "A natural and grounded theme featuring earth tones inspired by dense forest environments.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/anthropics/skills.git",
+    "repoPath": "skills/theme-factory/themes/forest-canopy.md",
+    "syncedAt": "2026-02-04T10:29:36.735Z"
+  },
+  "isProtected": false
+}

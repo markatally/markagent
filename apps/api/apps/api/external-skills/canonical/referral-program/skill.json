@@ -1,0 +1,17 @@
+{
+  "canonicalId": "referral-program",
+  "name": "referral-program",
+  "description": "\"When the user wants to create, optimize, or analyze a referral program, affiliate program, or word-of-mouth strategy. Also use when the user mentions 'referral,' 'affiliate,' 'ambassador,' 'word of mouth,' 'viral loop,' 'refer a friend,' or 'partner program.' This skill covers program design, incentive structure, and growth optimization.\"",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "skills/referral-program/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:39.451Z"
+  },
+  "isProtected": false
+}

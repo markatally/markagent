@@ -1,0 +1,17 @@
+{
+  "canonicalId": "mention-me",
+  "name": "Mention Me",
+  "description": "Enterprise referral marketing platform for customer advocacy.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "tools/integrations/mention-me.md",
+    "syncedAt": "2026-02-04T10:29:39.441Z"
+  },
+  "isProtected": false
+}

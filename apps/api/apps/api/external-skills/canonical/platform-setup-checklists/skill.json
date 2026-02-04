@@ -1,0 +1,17 @@
+{
+  "canonicalId": "platform-setup-checklists",
+  "name": "Platform Setup Checklists",
+  "description": "Complete setup checklists for major ad platforms.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "skills/paid-ads/references/platform-setup-checklists.md",
+    "syncedAt": "2026-02-04T10:29:39.447Z"
+  },
+  "isProtected": false
+}

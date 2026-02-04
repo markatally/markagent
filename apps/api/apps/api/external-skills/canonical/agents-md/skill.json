@@ -1,0 +1,17 @@
+{
+  "canonicalId": "agents-md",
+  "name": "AGENTS.md",
+  "description": "Guidelines for AI agents working in this repository.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "AGENTS.md",
+    "syncedAt": "2026-02-04T10:29:39.451Z"
+  },
+  "isProtected": false
+}

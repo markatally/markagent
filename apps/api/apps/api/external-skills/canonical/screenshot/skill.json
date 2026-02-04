@@ -1,0 +1,17 @@
+{
+  "canonicalId": "screenshot",
+  "name": "\"screenshot\"",
+  "description": "\"Use when the user explicitly asks for a desktop or system screenshot (full screen, specific app or window, or a pixel region), or when tool-specific capture capabilities are unavailable and an OS-level capture is needed.\"",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/screenshot/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:38.524Z"
+  },
+  "isProtected": false
+}

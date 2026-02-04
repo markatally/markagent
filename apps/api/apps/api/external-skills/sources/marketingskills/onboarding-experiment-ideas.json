@@ -1,0 +1,17 @@
+{
+  "canonicalId": "onboarding-experiment-ideas",
+  "name": "Onboarding Experiment Ideas",
+  "description": "Comprehensive list of A/B tests and experiments for user onboarding and activation.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "skills/onboarding-cro/references/experiments.md",
+    "syncedAt": "2026-02-04T10:29:39.448Z"
+  },
+  "isProtected": false
+}

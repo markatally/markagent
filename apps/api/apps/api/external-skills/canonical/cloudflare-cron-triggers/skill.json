@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-cron-triggers",
+  "name": "Cloudflare Cron Triggers",
+  "description": "Schedule Workers execution using cron expressions. Runs on Cloudflare's global network during underutilized periods.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/cron-triggers/README.md",
+    "syncedAt": "2026-02-04T10:29:38.540Z"
+  },
+  "isProtected": false
+}

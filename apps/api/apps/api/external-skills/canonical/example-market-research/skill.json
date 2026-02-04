@@ -1,0 +1,17 @@
+{
+  "canonicalId": "example-market-research",
+  "name": "Example: Market Research",
+  "description": "**User Request**: \"Research the current state of AI coding assistants market and create a summary document in Notion\"",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/notion-research-documentation/examples/market-research.md",
+    "syncedAt": "2026-02-04T10:29:38.532Z"
+  },
+  "isProtected": false
+}

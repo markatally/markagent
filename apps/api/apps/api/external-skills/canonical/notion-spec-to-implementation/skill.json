@@ -1,0 +1,17 @@
+{
+  "canonicalId": "notion-spec-to-implementation",
+  "name": "notion-spec-to-implementation",
+  "description": "Turn Notion specs into implementation plans, tasks, and progress tracking; use when implementing PRDs/feature specs and creating Notion plans + tasks from them.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/notion-spec-to-implementation/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:38.567Z"
+  },
+  "isProtected": false
+}

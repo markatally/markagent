@@ -136,8 +136,16 @@ async function apiFetch<T>(
 
     try {
       const errorData = await response.json();
-      errorMessage = errorData.message || errorData.error || errorMessage;
-      errorCode = errorData.code || errorCode;
+      // Extract error message from various response formats
+      if (errorData.error?.message) {
+        errorMessage = errorData.error.message;
+        errorCode = errorData.error.code || errorCode;
+      } else if (errorData.message) {
+        errorMessage = errorData.message;
+        errorCode = errorData.code || errorCode;
+      } else if (typeof errorData.error === 'string') {
+        errorMessage = errorData.error;
+      }
     } catch {
       // Response is not JSON, use default message
     }

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "ahrefs",
+  "name": "Ahrefs",
+  "description": "SEO toolset for backlink analysis, keyword research, and competitive research.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "tools/integrations/ahrefs.md",
+    "syncedAt": "2026-02-04T10:29:39.441Z"
+  },
+  "isProtected": false
+}

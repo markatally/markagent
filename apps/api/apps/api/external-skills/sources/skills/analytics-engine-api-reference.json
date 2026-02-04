@@ -1,0 +1,17 @@
+{
+  "canonicalId": "analytics-engine-api-reference",
+  "name": "Analytics Engine API Reference",
+  "description": "Fire-and-forget (returns `void`, not Promise). Writes happen asynchronously.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/analytics-engine/api.md",
+    "syncedAt": "2026-02-04T10:29:38.549Z"
+  },
+  "isProtected": false
+}

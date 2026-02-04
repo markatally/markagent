@@ -1,0 +1,17 @@
+{
+  "canonicalId": "realtimekit-gotchas-troubleshooting",
+  "name": "RealtimeKit Gotchas & Troubleshooting",
+  "description": "**Cause:** Auth token invalid/expired, API credentials lack permissions, or network blocks WebRTC",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/realtimekit/gotchas.md",
+    "syncedAt": "2026-02-04T10:29:38.542Z"
+  },
+  "isProtected": false
+}

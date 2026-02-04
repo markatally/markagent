@@ -1,0 +1,17 @@
+{
+  "canonicalId": "codebase-analysis-deploy",
+  "name": "Codebase Analysis (Deploy)",
+  "description": "Use this reference for framework-specific detection and build/start command selection when preparing a Render deployment.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/render-deploy/references/codebase-analysis.md",
+    "syncedAt": "2026-02-04T10:29:38.566Z"
+  },
+  "isProtected": false
+}

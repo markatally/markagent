@@ -1,0 +1,17 @@
+{
+  "canonicalId": "anthropic-agent-skills",
+  "name": "anthropic-agent-skills",
+  "description": "External skill",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/anthropics/skills.git",
+    "repoPath": ".claude-plugin/marketplace.json",
+    "syncedAt": "2026-02-04T10:29:36.734Z"
+  },
+  "isProtected": false
+}

@@ -10,6 +10,7 @@ import { getSkillProcessor } from '../services/skills/processor';
 import { getTaskManager } from '../services/tasks';
 import { processAgentOutput } from '../services/table';
 import path from 'path';
+import { getExternalSkillLoader } from '../services/external-skills/loader';
 
 // LangGraph imports (optional - for graph-based agent execution)
 import {
@@ -20,6 +21,7 @@ import {
 } from '../services/langgraph';
 
 const stream = new Hono<AuthContext>();
+const externalSkillLoader = getExternalSkillLoader();
 
 // All stream routes require authentication
 stream.use('*', requireAuth);
@@ -645,6 +647,8 @@ stream.post('/sessions/:sessionId/chat', async (c) => {
     );
   }
 
+  await externalSkillLoader.getSkillSnapshot(sessionId);
+
   // Create user message
   const userMessage = await prisma.message.create({
     data: {
@@ -923,6 +927,8 @@ stream.post('/sessions/:sessionId/agent', async (c) => {
       400
     );
   }
+
+  await externalSkillLoader.getSkillSnapshot(sessionId);
 
   // Create user message
   const userMessage = await prisma.message.create({

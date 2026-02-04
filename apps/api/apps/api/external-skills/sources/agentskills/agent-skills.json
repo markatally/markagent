@@ -1,0 +1,17 @@
+{
+  "canonicalId": "agent-skills",
+  "name": "Agent Skills",
+  "description": "[Agent Skills](https://agentskills.io) are a simple, open format for giving agents new capabilities and expertise.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/agentskills/agentskills",
+    "repoPath": "README.md",
+    "syncedAt": "2026-02-04T10:29:37.646Z"
+  },
+  "isProtected": false
+}

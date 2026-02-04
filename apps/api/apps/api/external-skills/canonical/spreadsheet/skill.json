@@ -1,0 +1,17 @@
+{
+  "canonicalId": "spreadsheet",
+  "name": "\"spreadsheet\"",
+  "description": "\"Use when tasks involve creating, editing, analyzing, or formatting spreadsheets (`.xlsx`, `.csv`, `.tsv`) using Python (`openpyxl`, `pandas`), especially when formulas, references, and formatting need to be preserved and verified.\"",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/spreadsheet/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:38.526Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "kit-formerly-convertkit",
+  "name": "Kit (formerly ConvertKit)",
+  "description": "Email marketing platform for creators and newsletter businesses.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "tools/integrations/kit.md",
+    "syncedAt": "2026-02-04T10:29:39.440Z"
+  },
+  "isProtected": false
+}

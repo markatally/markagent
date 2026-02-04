@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-network-interconnect-cni",
+  "name": "Cloudflare Network Interconnect (CNI)",
+  "description": "Private, high-performance connectivity to Cloudflare's network. **Enterprise-only**.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/network-interconnect/README.md",
+    "syncedAt": "2026-02-04T10:29:38.555Z"
+  },
+  "isProtected": false
+}

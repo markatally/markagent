@@ -1,0 +1,17 @@
+{
+  "canonicalId": "salesforce",
+  "name": "Salesforce",
+  "description": "Enterprise CRM platform for sales, service, and marketing.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "tools/integrations/salesforce.md",
+    "syncedAt": "2026-02-04T10:29:39.441Z"
+  },
+  "isProtected": false
+}

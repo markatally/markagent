@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cinematic-shot-templates",
+  "name": "Cinematic shot templates",
+  "description": "Use these for filmic, mood-forward clips. Keep one subject, one action, one camera move.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/sora/references/cinematic-shots.md",
+    "syncedAt": "2026-02-04T10:29:38.524Z"
+  },
+  "isProtected": false
+}

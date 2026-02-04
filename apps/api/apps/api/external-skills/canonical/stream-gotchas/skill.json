@@ -1,0 +1,17 @@
+{
+  "canonicalId": "stream-gotchas",
+  "name": "Stream Gotchas",
+  "description": "**Cause:** Uploaded file is not a valid video format",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/stream/gotchas.md",
+    "syncedAt": "2026-02-04T10:29:38.548Z"
+  },
+  "isProtected": false
+}

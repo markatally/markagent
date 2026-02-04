@@ -1,0 +1,17 @@
+{
+  "canonicalId": "email-types-reference",
+  "name": "Email Types Reference",
+  "description": "A comprehensive guide to lifecycle and campaign emails. Use this as an audit checklist and implementation reference.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "skills/email-sequence/references/email-types.md",
+    "syncedAt": "2026-02-04T10:29:39.450Z"
+  },
+  "isProtected": false
+}

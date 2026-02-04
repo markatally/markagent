@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-d1-database",
+  "name": "Cloudflare D1 Database",
+  "description": "Expert guidance for Cloudflare D1, a serverless SQLite database designed for horizontal scale-out across multiple databases.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/d1/README.md",
+    "syncedAt": "2026-02-04T10:29:38.543Z"
+  },
+  "isProtected": false
+}

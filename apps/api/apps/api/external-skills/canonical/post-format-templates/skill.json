@@ -1,0 +1,17 @@
+{
+  "canonicalId": "post-format-templates",
+  "name": "Post Format Templates",
+  "description": "Ready-to-use templates for different platforms and content types.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "skills/social-content/references/post-templates.md",
+    "syncedAt": "2026-02-04T10:29:39.445Z"
+  },
+  "isProtected": false
+}

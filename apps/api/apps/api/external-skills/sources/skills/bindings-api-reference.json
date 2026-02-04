@@ -1,0 +1,17 @@
+{
+  "canonicalId": "bindings-api-reference",
+  "name": "Bindings API Reference",
+  "description": "Cloudflare generates binding types via `npx wrangler types`. This creates `.wrangler/types/runtime.d.ts` with your Env interface.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/bindings/api.md",
+    "syncedAt": "2026-02-04T10:29:38.562Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "comparison-template",
+  "name": "Comparison Template",
+  "description": "Use when researching multiple options or alternatives. See [comparison-format.md](comparison-format.md) for when to use this format.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/notion-research-documentation/reference/comparison-template.md",
+    "syncedAt": "2026-02-04T10:29:38.533Z"
+  },
+  "isProtected": false
+}

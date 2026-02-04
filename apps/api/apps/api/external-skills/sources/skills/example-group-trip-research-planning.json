@@ -1,0 +1,17 @@
+{
+  "canonicalId": "example-group-trip-research-planning",
+  "name": "Example: Group Trip Research & Planning",
+  "description": "**User Request**: \"Research and plan our friends' trip to Japan in March - we're 6 people looking for 10 days\"",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/notion-research-documentation/examples/trip-planning.md",
+    "syncedAt": "2026-02-04T10:29:38.532Z"
+  },
+  "isProtected": false
+}

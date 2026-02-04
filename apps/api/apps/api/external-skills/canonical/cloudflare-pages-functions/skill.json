@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-pages-functions",
+  "name": "Cloudflare Pages Functions",
+  "description": "Serverless functions on Cloudflare Pages using Workers runtime. Full-stack dev with file-based routing.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/pages-functions/README.md",
+    "syncedAt": "2026-02-04T10:29:38.554Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "atlas",
+  "name": "\"atlas\"",
+  "description": "\"macOS-only AppleScript control for the ChatGPT Atlas desktop app. Use only when the user explicitly asks to control Atlas tabs/bookmarks/history on macOS and the \\\"ChatGPT Atlas\\\" app is installed; do not trigger for general browser tasks or non-macOS environments.\"",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/atlas/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:38.568Z"
+  },
+  "isProtected": false
+}

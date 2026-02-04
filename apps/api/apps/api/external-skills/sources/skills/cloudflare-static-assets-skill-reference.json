@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-static-assets-skill-reference",
+  "name": "Cloudflare Static Assets Skill Reference",
+  "description": "Expert guidance for deploying and configuring static assets with Cloudflare Workers. This skill covers configuration patterns, routing architectures, asset binding usage, and best practices for SPAs, SSG sites, and full-stack applications.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/static-assets/README.md",
+    "syncedAt": "2026-02-04T10:29:38.554Z"
+  },
+  "isProtected": false
+}

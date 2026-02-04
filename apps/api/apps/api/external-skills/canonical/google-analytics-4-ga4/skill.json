@@ -1,0 +1,17 @@
+{
+  "canonicalId": "google-analytics-4-ga4",
+  "name": "Google Analytics 4 (GA4)",
+  "description": "Web analytics platform for tracking user behavior, conversions, and marketing performance.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "tools/integrations/ga4.md",
+    "syncedAt": "2026-02-04T10:29:39.439Z"
+  },
+  "isProtected": false
+}

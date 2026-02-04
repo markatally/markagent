@@ -1,0 +1,17 @@
+{
+  "canonicalId": "section-templates-for-competitor-pages",
+  "name": "Section Templates for Competitor Pages",
+  "description": "Ready-to-use templates for each section of competitor comparison pages.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "skills/competitor-alternatives/references/templates.md",
+    "syncedAt": "2026-02-04T10:29:39.445Z"
+  },
+  "isProtected": false
+}

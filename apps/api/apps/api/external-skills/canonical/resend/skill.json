@@ -1,0 +1,17 @@
+{
+  "canonicalId": "resend",
+  "name": "Resend",
+  "description": "Developer-friendly transactional email service with modern API.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "tools/integrations/resend.md",
+    "syncedAt": "2026-02-04T10:29:39.439Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "agent-skills",
+  "name": "Agent Skills",
+  "description": "Agent Skills are folders of instructions, scripts, and resources that AI agents can discover and use to perform at specific tasks. Write once, use everywhere.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "README.md",
+    "syncedAt": "2026-02-04T10:29:38.522Z"
+  },
+  "isProtected": false
+}

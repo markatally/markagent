@@ -1,0 +1,17 @@
+{
+  "canonicalId": "sora-video-api-quick-reference",
+  "name": "Sora Video API quick reference",
+  "description": "Keep this file short; the full docs live in the OpenAI platform docs.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/sora/references/video-api.md",
+    "syncedAt": "2026-02-04T10:29:38.525Z"
+  },
+  "isProtected": false
+}

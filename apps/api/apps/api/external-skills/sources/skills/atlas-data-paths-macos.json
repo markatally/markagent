@@ -1,0 +1,17 @@
+{
+  "canonicalId": "atlas-data-paths-macos",
+  "name": "Atlas Data Paths (macOS)",
+  "description": "Atlas stores Chromium-style profile data under:",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/atlas/references/atlas-data.md",
+    "syncedAt": "2026-02-04T10:29:38.568Z"
+  },
+  "isProtected": false
+}

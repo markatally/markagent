@@ -1,0 +1,17 @@
+{
+  "canonicalId": "doc",
+  "name": "\"doc\"",
+  "description": "\"Use when the task involves reading, creating, or editing `.docx` documents, especially when formatting or layout fidelity matters; prefer `python-docx` plus the bundled `scripts/render_docx.py` for visual checks.\"",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/doc/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:38.568Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-r2-object-storage",
+  "name": "Cloudflare R2 Object Storage",
+  "description": "S3-compatible object storage with zero egress fees, optimized for large file storage and delivery.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/r2/README.md",
+    "syncedAt": "2026-02-04T10:29:38.565Z"
+  },
+  "isProtected": false
+}

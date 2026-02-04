@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-turnstile-implementation-skill-reference",
+  "name": "Cloudflare Turnstile Implementation Skill Reference",
+  "description": "Expert guidance for implementing Cloudflare Turnstile - a smart CAPTCHA alternative that protects websites from bots without showing traditional CAPTCHA puzzles.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/turnstile/README.md",
+    "syncedAt": "2026-02-04T10:29:38.554Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "render-runtime-options",
+  "name": "Render Runtime Options",
+  "description": "Complete guide to available runtimes on Render, including versions, configuration, and best practices for each language.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/render-deploy/references/runtimes.md",
+    "syncedAt": "2026-02-04T10:29:38.566Z"
+  },
+  "isProtected": false
+}

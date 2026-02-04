@@ -3,8 +3,10 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { prisma } from '../services/prisma';
 import { requireAuth, AuthContext } from '../middleware/auth';
+import { getExternalSkillLoader } from '../services/external-skills/loader';
 
 const sessions = new Hono<AuthContext>();
+const externalSkillLoader = getExternalSkillLoader();
 
 // All session routes require authentication
 sessions.use('*', requireAuth);
@@ -70,7 +72,15 @@ sessions.post('/', zValidator('json', createSessionSchema), async (c) => {
     },
   });
 
-  return c.json(session, 201);
+  const snapshot = await externalSkillLoader.getSkillSnapshot(session.id);
+
+  return c.json(
+    {
+      ...session,
+      externalSkillSnapshotId: snapshot.snapshotId,
+    },
+    201
+  );
 });
 
 /**

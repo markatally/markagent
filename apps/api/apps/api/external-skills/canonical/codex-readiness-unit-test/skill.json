@@ -1,0 +1,17 @@
+{
+  "canonicalId": "codex-readiness-unit-test",
+  "name": "codex-readiness-unit-test",
+  "description": "Run the Codex Readiness unit test report. Use when you need deterministic checks plus in-session LLM evals for AGENTS.md/PLANS.md.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.experimental/codex-readiness-unit-test/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:38.571Z"
+  },
+  "isProtected": false
+}

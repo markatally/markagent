@@ -1,0 +1,17 @@
+{
+  "canonicalId": "quick-brief-format",
+  "name": "Quick Brief Format",
+  "description": "**When to use**:",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/notion-research-documentation/reference/quick-brief-format.md",
+    "syncedAt": "2026-02-04T10:29:38.532Z"
+  },
+  "isProtected": false
+}

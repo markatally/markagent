@@ -1,0 +1,17 @@
+{
+  "canonicalId": "schema-markup-examples",
+  "name": "Schema Markup Examples",
+  "description": "Complete JSON-LD examples for common schema types.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "skills/schema-markup/references/schema-examples.md",
+    "syncedAt": "2026-02-04T10:29:39.449Z"
+  },
+  "isProtected": false
+}

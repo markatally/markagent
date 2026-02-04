@@ -1,0 +1,17 @@
+{
+  "canonicalId": "sunset-boulevard",
+  "name": "Sunset Boulevard",
+  "description": "A warm and vibrant theme inspired by golden hour sunsets, perfect for energetic and creative presentations.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/anthropics/skills.git",
+    "repoPath": "skills/theme-factory/themes/sunset-boulevard.md",
+    "syncedAt": "2026-02-04T10:29:36.734Z"
+  },
+  "isProtected": false
+}

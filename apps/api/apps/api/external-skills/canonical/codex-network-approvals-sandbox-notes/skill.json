@@ -1,0 +1,17 @@
+{
+  "canonicalId": "codex-network-approvals-sandbox-notes",
+  "name": "Codex network approvals / sandbox notes",
+  "description": "This guidance is intentionally isolated from `SKILL.md` because it can vary by environment and may become stale. Prefer the defaults in your environment when in doubt.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/sora/references/codex-network.md",
+    "syncedAt": "2026-02-04T10:29:38.525Z"
+  },
+  "isProtected": false
+}

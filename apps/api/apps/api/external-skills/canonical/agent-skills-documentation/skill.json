@@ -1,0 +1,17 @@
+{
+  "canonicalId": "agent-skills-documentation",
+  "name": "Agent Skills Documentation",
+  "description": "This directory contains the source code for the Agent Skills documentation site, which is built using [Mintlify](https://mintlify.com).",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/agentskills/agentskills",
+    "repoPath": "docs/README.md",
+    "syncedAt": "2026-02-04T10:29:37.645Z"
+  },
+  "isProtected": false
+}

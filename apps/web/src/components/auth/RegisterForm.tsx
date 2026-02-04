@@ -83,9 +83,20 @@ export function RegisterForm() {
 
       navigate('/chat');
     } catch (error: any) {
+      // Extract error message from various error formats
+      let errorMessage = 'Could not create account';
+      
+      if (error?.message && typeof error.message === 'string') {
+        errorMessage = error.message;
+      } else if (error?.error?.message && typeof error.error.message === 'string') {
+        errorMessage = error.error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+
       toast({
         title: 'Registration failed',
-        description: error.message || 'Could not create account',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

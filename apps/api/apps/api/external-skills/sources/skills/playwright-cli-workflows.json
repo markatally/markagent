@@ -1,0 +1,17 @@
+{
+  "canonicalId": "playwright-cli-workflows",
+  "name": "Playwright CLI Workflows",
+  "description": "Use the wrapper script and snapshot often.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/playwright/references/workflows.md",
+    "syncedAt": "2026-02-04T10:29:38.531Z"
+  },
+  "isProtected": false
+}

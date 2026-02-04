@@ -1,0 +1,17 @@
+{
+  "canonicalId": "claude-md",
+  "name": "CLAUDE.md",
+  "description": "This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. The project defines an open format for teaching AI agents specialized workflows through SKILL.md files.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/agentskills/agentskills",
+    "repoPath": "docs/CLAUDE.md",
+    "syncedAt": "2026-02-04T10:29:37.645Z"
+  },
+  "isProtected": false
+}

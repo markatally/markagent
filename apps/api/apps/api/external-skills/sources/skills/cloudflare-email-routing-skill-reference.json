@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-email-routing-skill-reference",
+  "name": "Cloudflare Email Routing Skill Reference",
+  "description": "Cloudflare Email Routing enables custom email addresses for your domain that route to verified destination addresses. It's free, privacy-focused (no storage/access), and includes Email Workers for programmatic email processing.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/email-routing/README.md",
+    "syncedAt": "2026-02-04T10:29:38.556Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "analytics-engine-configuration",
+  "name": "Analytics Engine Configuration",
+  "description": "1. Add binding to `wrangler.jsonc`",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/analytics-engine/configuration.md",
+    "syncedAt": "2026-02-04T10:29:38.549Z"
+  },
+  "isProtected": false
+}

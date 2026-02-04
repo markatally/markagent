@@ -1,0 +1,17 @@
+{
+  "canonicalId": "content-architecture-for-competitor-pages",
+  "name": "Content Architecture for Competitor Pages",
+  "description": "How to structure and maintain competitor data for scalable comparison pages.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "skills/competitor-alternatives/references/content-architecture.md",
+    "syncedAt": "2026-02-04T10:29:39.445Z"
+  },
+  "isProtected": false
+}

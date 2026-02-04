@@ -1,0 +1,17 @@
+{
+  "canonicalId": "knowledge-capture-skill-evaluations",
+  "name": "Knowledge Capture Skill Evaluations",
+  "description": "Evaluation scenarios for testing the Knowledge Capture skill across different Codex models.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/notion-knowledge-capture/evaluations/README.md",
+    "syncedAt": "2026-02-04T10:29:38.536Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "referral-program-examples",
+  "name": "Referral Program Examples",
+  "description": "Real-world examples of successful referral programs.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "skills/referral-program/references/program-examples.md",
+    "syncedAt": "2026-02-04T10:29:39.451Z"
+  },
+  "isProtected": false
+}

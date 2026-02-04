@@ -19,13 +19,22 @@ export interface TokenPayload {
  * Hash a password using bcrypt
  */
 export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 10);
+  const hash = await bcrypt.hash(password, 10);
+  // Ensure the hash is always returned as a string
+  return String(hash);
 }
 
 /**
  * Verify a password against a hash
  */
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  // Ensure both arguments are strings
+  if (typeof password !== 'string') {
+    throw new Error('Password must be a string');
+  }
+  if (typeof hash !== 'string' || !hash) {
+    throw new Error('Hash must be a non-empty string');
+  }
   return bcrypt.compare(password, hash);
 }
 

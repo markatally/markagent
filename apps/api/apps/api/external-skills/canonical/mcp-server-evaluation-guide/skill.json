@@ -1,0 +1,17 @@
+{
+  "canonicalId": "mcp-server-evaluation-guide",
+  "name": "MCP Server Evaluation Guide",
+  "description": "This document provides guidance on creating comprehensive evaluations for MCP servers. Evaluations test whether LLMs can effectively use your MCP server to answer realistic, complex questions using only the tools provided.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/anthropics/skills.git",
+    "repoPath": "skills/mcp-builder/reference/evaluation.md",
+    "syncedAt": "2026-02-04T10:29:36.739Z"
+  },
+  "isProtected": false
+}

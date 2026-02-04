@@ -1,0 +1,17 @@
+{
+  "canonicalId": "notion-research-documentation",
+  "name": "notion-research-documentation",
+  "description": "Research across Notion and synthesize into structured documentation; use when gathering info from multiple Notion sources to produce briefs, comparisons, or reports with citations.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/notion-research-documentation/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:38.532Z"
+  },
+  "isProtected": false
+}

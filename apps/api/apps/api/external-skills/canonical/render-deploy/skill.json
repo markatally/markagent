@@ -1,0 +1,17 @@
+{
+  "canonicalId": "render-deploy",
+  "name": "render-deploy",
+  "description": "Deploy applications to Render by analyzing codebases, generating render.yaml Blueprints, and providing Dashboard deeplinks. Use when the user wants to deploy, host, publish, or set up their application on Render's cloud platform.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/render-deploy/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:38.567Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "example-decision-record-capture",
+  "name": "Example: Decision Record Capture",
+  "description": "**User Request**: \"Document our decision to move from REST to GraphQL API\"",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/notion-knowledge-capture/examples/decision-capture.md",
+    "syncedAt": "2026-02-04T10:29:38.536Z"
+  },
+  "isProtected": false
+}

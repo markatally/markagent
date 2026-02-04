@@ -1,0 +1,17 @@
+{
+  "canonicalId": "skills",
+  "name": "Skills",
+  "description": "For more information, check out:",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/anthropics/skills.git",
+    "repoPath": "README.md",
+    "syncedAt": "2026-02-04T10:29:36.734Z"
+  },
+  "isProtected": false
+}

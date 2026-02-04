@@ -1,0 +1,18 @@
+{
+  "protectedPatterns": [
+    {
+      "pattern": "ppt|powerpoint|presentation",
+      "reason": "PPT generation - existing implementation"
+    },
+    {
+      "pattern": "web.?search|internet.?search",
+      "reason": "Web search - existing implementation"
+    },
+    {
+      "pattern": "paper.?search|academic.?search|arxiv|semantic.?scholar",
+      "reason": "Academic search - existing implementation"
+    }
+  ],
+  "protectedIds": ["ppt-generate", "web-search", "paper-search"],
+  "enforcementLevel": "RUNTIME"
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "go-golang-security-spec-go-1-25-x-standard-library-net-http",
+  "name": "Go (Golang) Security Spec (Go 1.25.x, Standard Library, net/http)",
+  "description": "This document is designed as a **security spec** that supports:",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/security-best-practices/references/golang-general-backend-security.md",
+    "syncedAt": "2026-02-04T10:29:38.530Z"
+  },
+  "isProtected": false
+}

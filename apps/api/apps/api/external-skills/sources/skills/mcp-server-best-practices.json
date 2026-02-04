@@ -1,0 +1,17 @@
+{
+  "canonicalId": "mcp-server-best-practices",
+  "name": "MCP Server Best Practices",
+  "description": "---",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/anthropics/skills.git",
+    "repoPath": "skills/mcp-builder/reference/mcp_best_practices.md",
+    "syncedAt": "2026-02-04T10:29:36.739Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-wrangler",
+  "name": "Cloudflare Wrangler",
+  "description": "Official CLI for Cloudflare Workers - develop, manage, and deploy Workers from the command line.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/wrangler/README.md",
+    "syncedAt": "2026-02-04T10:29:38.547Z"
+  },
+  "isProtected": false
+}

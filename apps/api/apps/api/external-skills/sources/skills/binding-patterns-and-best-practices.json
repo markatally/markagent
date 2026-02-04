@@ -1,0 +1,17 @@
+{
+  "canonicalId": "binding-patterns-and-best-practices",
+  "name": "Binding Patterns and Best Practices",
+  "description": "```typescript",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/bindings/patterns.md",
+    "syncedAt": "2026-02-04T10:29:38.562Z"
+  },
+  "isProtected": false
+}

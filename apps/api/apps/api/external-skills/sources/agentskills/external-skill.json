@@ -1,0 +1,17 @@
+{
+  "canonicalId": "external-skill",
+  "name": "external-skill",
+  "description": "External skill",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/agentskills/agentskills",
+    "repoPath": ".claude/settings.json",
+    "syncedAt": "2026-02-04T10:29:37.645Z"
+  },
+  "isProtected": false
+}

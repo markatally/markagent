@@ -138,3 +138,69 @@ model Feedback {
 
   @@map("feedback")
 }
+
+model ExternalSkill {
+  id                String              @id @default(cuid())
+  canonicalId       String              @unique @map("canonical_id")
+  name              String
+  description       String
+  version           String
+  status            SkillStatus         @default(ACTIVE)
+  category          String?
+  inputSchema       Json?               @map("input_schema")
+  outputSchema      Json?               @map("output_schema")
+  invocationPattern String?             @map("invocation_pattern")
+  dependencies      String[]
+  filePath          String              @map("file_path")
+
+  capabilityLevel   CapabilityLevel     @default(EXTERNAL) @map("capability_level")
+  runtimeVersion    String?             @map("runtime_version")
+  executionScope    ExecutionScope      @default(AGENT) @map("execution_scope")
+
+  sources           ExternalSkillSource[]
+  mergedFrom        String[]            @map("merged_from")
+
+  isProtected       Boolean             @default(false) @map("is_protected")
+  protectionReason  String?             @map("protection_reason")
+
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([status])
+  @@index([capabilityLevel])
+  @@map("external_skills")
+}
+
+model ExternalSkillSource {
+  id         String        @id @default(cuid())
+  skillId    String        @map("skill_id")
+  skill      ExternalSkill @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  repoUrl    String        @map("repo_url")
+  repoPath   String        @map("repo_path")
+  commitHash String?       @map("commit_hash")
+  license    String?
+  syncedAt   DateTime      @default(now()) @map("synced_at")
+
+  @@unique([skillId, repoUrl, repoPath])
+  @@map("external_skill_sources")
+}
+
+enum SkillStatus {
+  ACTIVE
+  EXTENDED
+  DEPRECATED
+  PROTECTED
+}
+
+enum CapabilityLevel {
+  EXTERNAL
+  INTERNAL
+  PRODUCT
+}
+
+enum ExecutionScope {
+  SYSTEM
+  AGENT
+  USER_VISIBLE
+}

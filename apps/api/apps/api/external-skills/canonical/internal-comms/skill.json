@@ -1,0 +1,17 @@
+{
+  "canonicalId": "internal-comms",
+  "name": "internal-comms",
+  "description": "A set of resources to help me write all kinds of internal communications, using the formats that my company likes to use. Claude should use this skill whenever asked to write some sort of internal communications (status reports, leadership updates, 3P updates, company newsletters, FAQs, incident reports, project updates, etc.).",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/anthropics/skills.git",
+    "repoPath": "skills/internal-comms/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:36.737Z"
+  },
+  "isProtected": false
+}

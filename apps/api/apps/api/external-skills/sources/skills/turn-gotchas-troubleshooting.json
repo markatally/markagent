@@ -1,0 +1,17 @@
+{
+  "canonicalId": "turn-gotchas-troubleshooting",
+  "name": "TURN Gotchas & Troubleshooting",
+  "description": "Common mistakes, security best practices, and troubleshooting for Cloudflare TURN.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/turn/gotchas.md",
+    "syncedAt": "2026-02-04T10:29:38.552Z"
+  },
+  "isProtected": false
+}

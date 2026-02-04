@@ -1,0 +1,17 @@
+{
+  "canonicalId": "paywall-experiment-ideas",
+  "name": "Paywall Experiment Ideas",
+  "description": "Comprehensive list of A/B tests and experiments for paywall optimization.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "skills/paywall-upgrade-cro/references/experiments.md",
+    "syncedAt": "2026-02-04T10:29:39.449Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "example-executive-review-prep",
+  "name": "Example: Executive Review Prep",
+  "description": "**User Request**: \"Prep for quarterly executive review on Friday\"",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/notion-meeting-intelligence/examples/executive-review.md",
+    "syncedAt": "2026-02-04T10:29:38.528Z"
+  },
+  "isProtected": false
+}

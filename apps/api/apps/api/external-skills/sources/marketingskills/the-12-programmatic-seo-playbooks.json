@@ -1,0 +1,17 @@
+{
+  "canonicalId": "the-12-programmatic-seo-playbooks",
+  "name": "The 12 Programmatic SEO Playbooks",
+  "description": "Beyond mixing and matching data point permutations, these are the proven playbooks for programmatic SEO.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "skills/programmatic-seo/references/playbooks.md",
+    "syncedAt": "2026-02-04T10:29:39.443Z"
+  },
+  "isProtected": false
+}

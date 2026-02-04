@@ -1,0 +1,17 @@
+{
+  "canonicalId": "instructioning-best-practices-tts",
+  "name": "Instructioning best practices (TTS)",
+  "description": "External skill",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/speech/references/prompting.md",
+    "syncedAt": "2026-02-04T10:29:38.534Z"
+  },
+  "isProtected": false
+}

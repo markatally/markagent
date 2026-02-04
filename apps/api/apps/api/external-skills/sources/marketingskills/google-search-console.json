@@ -1,0 +1,17 @@
+{
+  "canonicalId": "google-search-console",
+  "name": "Google Search Console",
+  "description": "Free tool for monitoring website search performance and indexing.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "tools/integrations/google-search-console.md",
+    "syncedAt": "2026-02-04T10:29:39.441Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "affiliate-program-design",
+  "name": "Affiliate Program Design",
+  "description": "Detailed guidance for building and managing affiliate programs.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "skills/referral-program/references/affiliate-programs.md",
+    "syncedAt": "2026-02-04T10:29:39.451Z"
+  },
+  "isProtected": false
+}

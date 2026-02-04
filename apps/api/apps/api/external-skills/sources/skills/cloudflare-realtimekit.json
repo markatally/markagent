@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-realtimekit",
+  "name": "Cloudflare RealtimeKit",
+  "description": "Expert guidance for building real-time video and audio applications using **Cloudflare RealtimeKit** - a comprehensive SDK suite for adding customizable live video and voice to web or mobile applications.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/realtimekit/README.md",
+    "syncedAt": "2026-02-04T10:29:38.543Z"
+  },
+  "isProtected": false
+}

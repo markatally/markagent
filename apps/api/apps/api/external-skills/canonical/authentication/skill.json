@@ -1,0 +1,17 @@
+{
+  "canonicalId": "authentication",
+  "name": "Authentication",
+  "description": "Authenticate with Cloudflare before deploying Workers or Pages.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/wrangler/auth.md",
+    "syncedAt": "2026-02-04T10:29:38.547Z"
+  },
+  "isProtected": false
+}

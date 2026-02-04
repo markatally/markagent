@@ -1,0 +1,17 @@
+{
+  "canonicalId": "pdf",
+  "name": "\"pdf\"",
+  "description": "\"Use when tasks involve reading, creating, or reviewing PDF files where rendering and layout matter; prefer visual checks by rendering pages (Poppler) and use Python tools such as `reportlab`, `pdfplumber`, and `pypdf` for generation and extraction.\"",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/pdf/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:38.531Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "sample-size-guide",
+  "name": "Sample Size Guide",
+  "description": "Reference for calculating sample sizes and test duration.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "skills/ab-test-setup/references/sample-size-guide.md",
+    "syncedAt": "2026-02-04T10:29:39.451Z"
+  },
+  "isProtected": false
+}

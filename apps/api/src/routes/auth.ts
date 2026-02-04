@@ -60,6 +60,20 @@ auth.post('/register', zValidator('json', registerSchema), async (c) => {
   // Hash password
   const passwordHash = await hashPassword(password);
 
+  // Ensure passwordHash is a string
+  if (typeof passwordHash !== 'string') {
+    console.error('Password hash is not a string:', typeof passwordHash, passwordHash);
+    return c.json(
+      {
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to hash password',
+        },
+      },
+      500
+    );
+  }
+
   // Create user
   const user = await prisma.user.create({
     data: {
@@ -109,8 +123,26 @@ auth.post('/login', zValidator('json', loginSchema), async (c) => {
     );
   }
 
+  // Check if user has a password hash (not OAuth-only user)
+  if (!user.passwordHash) {
+    return c.json(
+      {
+        error: {
+          code: 'INVALID_CREDENTIALS',
+          message: 'This account uses Google login. Please sign in with Google.',
+        },
+      },
+      401
+    );
+  }
+
+  // Ensure passwordHash is a string
+  const passwordHash = typeof user.passwordHash === 'string' 
+    ? user.passwordHash 
+    : String(user.passwordHash);
+
   // Verify password
-  const isValid = await verifyPassword(password, user.passwordHash);
+  const isValid = await verifyPassword(password, passwordHash);
 
   if (!isValid) {
     return c.json(

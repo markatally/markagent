@@ -1,0 +1,17 @@
+{
+  "canonicalId": "threat-modeling-prompt-template-for-llms",
+  "name": "Threat Modeling Prompt Template for LLMs",
+  "description": "This reference provides a disciplined, repo-grounded prompt that produces AppSec-usable threat models. Use it when you need a reliable output contract and a consistent process to assemble the threat model output",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/security-threat-model/references/prompt-template.md",
+    "syncedAt": "2026-02-04T10:29:38.523Z"
+  },
+  "isProtected": false
+}

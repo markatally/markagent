@@ -1,0 +1,17 @@
+{
+  "canonicalId": "sample-instruction-templates-copy-paste",
+  "name": "Sample instruction templates (copy/paste)",
+  "description": "These are short instruction blocks. Use only the lines you need and keep them consistent with the input text.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/speech/references/sample-prompts.md",
+    "syncedAt": "2026-02-04T10:29:38.533Z"
+  },
+  "isProtected": false
+}

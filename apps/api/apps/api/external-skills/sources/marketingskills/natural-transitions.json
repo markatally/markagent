@@ -1,0 +1,17 @@
+{
+  "canonicalId": "natural-transitions",
+  "name": "Natural Transitions",
+  "description": "Transitional phrases to guide readers through your content. Good signposting improves readability, user engagement, and helps search engines understand content structure.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "skills/copywriting/references/natural-transitions.md",
+    "syncedAt": "2026-02-04T10:29:39.444Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "openai-docs",
+  "name": "\"openai-docs\"",
+  "description": "\"Use when the user asks how to build with OpenAI products or APIs and needs up-to-date official documentation with citations (for example: Codex, Responses API, Chat Completions, Apps SDK, Agents SDK, Realtime, model capabilities or limits); prioritize OpenAI docs MCP tools and restrict any fallback browsing to official OpenAI domains.\"",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/openai-docs/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:38.568Z"
+  },
+  "isProtected": false
+}

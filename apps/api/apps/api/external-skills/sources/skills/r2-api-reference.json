@@ -1,0 +1,17 @@
+{
+  "canonicalId": "r2-api-reference",
+  "name": "R2 API Reference",
+  "description": "```typescript",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/r2/api.md",
+    "syncedAt": "2026-02-04T10:29:38.565Z"
+  },
+  "isProtected": false
+}

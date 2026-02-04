@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-images-skill-reference",
+  "name": "Cloudflare Images Skill Reference",
+  "description": "**Cloudflare Images** is an end-to-end image management solution providing storage, transformation, optimization, and delivery at scale via Cloudflare's global network.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/images/README.md",
+    "syncedAt": "2026-02-04T10:29:38.546Z"
+  },
+  "isProtected": false
+}

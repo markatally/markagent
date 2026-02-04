@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-sandbox-sdk",
+  "name": "Cloudflare Sandbox SDK",
+  "description": "Secure isolated code execution in containers on Cloudflare's edge. Run untrusted code, manage files, expose services, integrate with AI agents.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/sandbox/README.md",
+    "syncedAt": "2026-02-04T10:29:38.555Z"
+  },
+  "isProtected": false
+}

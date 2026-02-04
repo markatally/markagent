@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-argo-smart-routing-skill-reference",
+  "name": "Cloudflare Argo Smart Routing Skill Reference",
+  "description": "Cloudflare Argo Smart Routing is a performance optimization service that detects real-time network issues and routes web traffic across the most efficient network path. It continuously monitors network conditions and intelligently routes traffic through the fastest, most reliable routes in Cloudflare's network.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/argo-smart-routing/README.md",
+    "syncedAt": "2026-02-04T10:29:38.550Z"
+  },
+  "isProtected": false
+}

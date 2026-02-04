@@ -1,0 +1,17 @@
+{
+  "canonicalId": "deployment-details",
+  "name": "Deployment Details",
+  "description": "Use this reference for service discovery, configuration patterns, quick commands, and common issues.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/render-deploy/references/deployment-details.md",
+    "syncedAt": "2026-02-04T10:29:38.566Z"
+  },
+  "isProtected": false
+}

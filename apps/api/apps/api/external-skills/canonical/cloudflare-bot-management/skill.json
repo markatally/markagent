@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-bot-management",
+  "name": "Cloudflare Bot Management",
+  "description": "Enterprise-grade bot detection, protection, and mitigation using ML/heuristics, bot scores, JavaScript detections, and verified bot handling.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/bot-management/README.md",
+    "syncedAt": "2026-02-04T10:29:38.546Z"
+  },
+  "isProtected": false
+}

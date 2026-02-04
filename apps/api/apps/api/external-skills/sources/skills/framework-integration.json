@@ -1,0 +1,17 @@
+{
+  "canonicalId": "framework-integration",
+  "name": "Framework Integration",
+  "description": "**Web Analytics is dashboard-only** - no programmatic API. This covers beacon integration.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/web-analytics/integration.md",
+    "syncedAt": "2026-02-04T10:29:38.556Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "python-mcp-server-implementation-guide",
+  "name": "Python MCP Server Implementation Guide",
+  "description": "This document provides Python-specific best practices and examples for implementing MCP servers using the MCP Python SDK. It covers server setup, tool registration patterns, input validation with Pydantic, error handling, and complete working examples.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/anthropics/skills.git",
+    "repoPath": "skills/mcp-builder/reference/python_mcp_server.md",
+    "syncedAt": "2026-02-04T10:29:36.739Z"
+  },
+  "isProtected": false
+}

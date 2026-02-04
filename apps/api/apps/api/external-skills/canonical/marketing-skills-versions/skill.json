@@ -1,0 +1,17 @@
+{
+  "canonicalId": "marketing-skills-versions",
+  "name": "Marketing Skills Versions",
+  "description": "Current versions of all skills. Agents can compare against local versions to check for updates.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "VERSIONS.md",
+    "syncedAt": "2026-02-04T10:29:39.441Z"
+  },
+  "isProtected": false
+}

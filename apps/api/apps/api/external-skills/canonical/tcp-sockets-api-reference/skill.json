@@ -1,0 +1,17 @@
+{
+  "canonicalId": "tcp-sockets-api-reference",
+  "name": "TCP Sockets API Reference",
+  "description": "Complete API reference for the Cloudflare Workers TCP Sockets API (`cloudflare:sockets`).",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/workers-vpc/api.md",
+    "syncedAt": "2026-02-04T10:29:38.542Z"
+  },
+  "isProtected": false
+}

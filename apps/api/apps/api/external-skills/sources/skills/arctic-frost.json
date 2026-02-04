@@ -1,0 +1,17 @@
+{
+  "canonicalId": "arctic-frost",
+  "name": "Arctic Frost",
+  "description": "A cool and crisp winter-inspired theme that conveys clarity, precision, and professionalism.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/anthropics/skills.git",
+    "repoPath": "skills/theme-factory/themes/arctic-frost.md",
+    "syncedAt": "2026-02-04T10:29:36.734Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-workers-smart-placement",
+  "name": "Cloudflare Workers Smart Placement",
+  "description": "Automatic workload placement optimization to minimize latency by running Workers closer to backend infrastructure rather than end users.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/smart-placement/README.md",
+    "syncedAt": "2026-02-04T10:29:38.538Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "copy-editing",
+  "name": "copy-editing",
+  "description": "\"When the user wants to edit, review, or improve existing marketing copy. Also use when the user mentions 'edit this copy,' 'review my copy,' 'copy feedback,' 'proofread,' 'polish this,' 'make this better,' or 'copy sweep.' This skill provides a systematic approach to editing marketing copy through multiple focused passes.\"",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "skills/copy-editing/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:39.445Z"
+  },
+  "isProtected": false
+}

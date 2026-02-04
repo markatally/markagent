@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-realtime-sfu-reference",
+  "name": "Cloudflare Realtime SFU Reference",
+  "description": "Expert guidance for building real-time audio/video/data applications using Cloudflare Realtime SFU (Selective Forwarding Unit).",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/realtime-sfu/README.md",
+    "syncedAt": "2026-02-04T10:29:38.565Z"
+  },
+  "isProtected": false
+}

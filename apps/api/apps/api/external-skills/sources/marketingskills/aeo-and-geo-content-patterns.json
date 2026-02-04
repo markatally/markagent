@@ -1,0 +1,17 @@
+{
+  "canonicalId": "aeo-and-geo-content-patterns",
+  "name": "AEO and GEO Content Patterns",
+  "description": "Reusable content block patterns optimized for answer engines and AI citation.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/coreyhaines31/marketingskills",
+    "repoPath": "skills/seo-audit/references/aeo-geo-patterns.md",
+    "syncedAt": "2026-02-04T10:29:39.443Z"
+  },
+  "isProtected": false
+}

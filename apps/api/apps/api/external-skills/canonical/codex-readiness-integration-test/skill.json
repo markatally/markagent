@@ -1,0 +1,17 @@
+{
+  "canonicalId": "codex-readiness-integration-test",
+  "name": "codex-readiness-integration-test",
+  "description": "Run the Codex Readiness integration test. Use when you need an end-to-end agentic loop with build/test scoring.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.experimental/codex-readiness-integration-test/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:38.572Z"
+  },
+  "isProtected": false
+}

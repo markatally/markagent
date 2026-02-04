@@ -1,0 +1,17 @@
+{
+  "canonicalId": "imagegen",
+  "name": "\"imagegen\"",
+  "description": "\"Use when the user asks to generate or edit images via the OpenAI Image API (for example: generate image, edit/inpaint/mask, background removal or replacement, transparent background, product shots, concept art, covers, or batch variants); run the bundled CLI (`scripts/image_gen.py`) and require `OPENAI_API_KEY` for live calls.\"",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/imagegen/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:38.571Z"
+  },
+  "isProtected": false
+}

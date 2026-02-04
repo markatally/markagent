@@ -1,0 +1,17 @@
+{
+  "canonicalId": "skill-creator",
+  "name": "skill-creator",
+  "description": "Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Claude's capabilities with specialized knowledge, workflows, or tool integrations.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/anthropics/skills.git",
+    "repoPath": "skills/skill-creator/SKILL.md",
+    "syncedAt": "2026-02-04T10:29:36.737Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "tech-innovation",
+  "name": "Tech Innovation",
+  "description": "A bold and modern theme with high-contrast colors perfect for cutting-edge technology presentations.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/anthropics/skills.git",
+    "repoPath": "skills/theme-factory/themes/tech-innovation.md",
+    "syncedAt": "2026-02-04T10:29:36.734Z"
+  },
+  "isProtected": false
+}

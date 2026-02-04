@@ -1,0 +1,17 @@
+{
+  "canonicalId": "direct-creation-mcp-details",
+  "name": "Direct Creation (MCP) Details",
+  "description": "Use this reference for MCP direct-creation examples and follow-on configuration.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/render-deploy/references/direct-creation.md",
+    "syncedAt": "2026-02-04T10:29:38.565Z"
+  },
+  "isProtected": false
+}

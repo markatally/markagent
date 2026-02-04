@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-queues",
+  "name": "Cloudflare Queues",
+  "description": "Flexible message queuing for async task processing with guaranteed at-least-once delivery and configurable batching.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/queues/README.md",
+    "syncedAt": "2026-02-04T10:29:38.557Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "example-database-migration-implementation",
+  "name": "Example: Database Migration Implementation",
+  "description": "**User Request**: \"Plan and implement the database migration for user preferences schema\"",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/notion-spec-to-implementation/examples/database-migration.md",
+    "syncedAt": "2026-02-04T10:29:38.567Z"
+  },
+  "isProtected": false
+}

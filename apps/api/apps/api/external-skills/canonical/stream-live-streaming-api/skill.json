@@ -1,0 +1,17 @@
+{
+  "canonicalId": "stream-live-streaming-api",
+  "name": "Stream Live Streaming API",
+  "description": "Live input creation, status checking, simulcast, and WebRTC streaming.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/stream/api-live.md",
+    "syncedAt": "2026-02-04T10:29:38.549Z"
+  },
+  "isProtected": false
+}

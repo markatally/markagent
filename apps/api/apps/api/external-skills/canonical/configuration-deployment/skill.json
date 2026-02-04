@@ -1,0 +1,17 @@
+{
+  "canonicalId": "configuration-deployment",
+  "name": "Configuration & Deployment",
+  "description": "1. Navigate to https://dash.cloudflare.com/?to=/:account/calls",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/realtime-sfu/configuration.md",
+    "syncedAt": "2026-02-04T10:29:38.565Z"
+  },
+  "isProtected": false
+}

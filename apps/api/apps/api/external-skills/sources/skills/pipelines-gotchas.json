@@ -1,0 +1,17 @@
+{
+  "canonicalId": "pipelines-gotchas",
+  "name": "Pipelines Gotchas",
+  "description": "**Most common issue.** Events accepted (HTTP 200) but never appear in sink.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/pipelines/gotchas.md",
+    "syncedAt": "2026-02-04T10:29:38.551Z"
+  },
+  "isProtected": false
+}

@@ -1,0 +1,17 @@
+{
+  "canonicalId": "example-ui-component-implementation",
+  "name": "Example: UI Component Implementation",
+  "description": "**User Request**: \"Implement the new search component from the design spec\"",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/notion-spec-to-implementation/examples/ui-component.md",
+    "syncedAt": "2026-02-04T10:29:38.567Z"
+  },
+  "isProtected": false
+}

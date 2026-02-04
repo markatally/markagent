@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-ai-search-reference",
+  "name": "Cloudflare AI Search Reference",
+  "description": "Expert guidance for implementing Cloudflare AI Search (formerly AutoRAG), Cloudflare's managed semantic search and RAG service.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/ai-search/README.md",
+    "syncedAt": "2026-02-04T10:29:38.559Z"
+  },
+  "isProtected": false
+}

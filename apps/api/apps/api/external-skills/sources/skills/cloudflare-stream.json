@@ -1,0 +1,17 @@
+{
+  "canonicalId": "cloudflare-stream",
+  "name": "Cloudflare Stream",
+  "description": "Serverless live and on-demand video streaming platform with one API.",
+  "version": "0.0.0",
+  "status": "ACTIVE",
+  "invocationPattern": "prompt",
+  "dependencies": [],
+  "capabilityLevel": "EXTERNAL",
+  "executionScope": "AGENT",
+  "source": {
+    "repoUrl": "https://github.com/openai/skills",
+    "repoPath": "skills/.curated/cloudflare-deploy/references/stream/README.md",
+    "syncedAt": "2026-02-04T10:29:38.548Z"
+  },
+  "isProtected": false
+}
