@@ -26,7 +26,7 @@ const REPOS = [
   },
 ];
 
-const ROOT_DIR = path.resolve(process.cwd(), 'apps', 'api', 'external-skills');
+const ROOT_DIR = path.resolve(process.cwd(), 'external-skills');
 const CACHE_DIR = path.join(ROOT_DIR, '.cache');
 const SOURCES_DIR = path.join(ROOT_DIR, 'sources');
 const CANONICAL_DIR = path.join(ROOT_DIR, 'canonical');
