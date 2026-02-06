@@ -32,7 +32,8 @@ apps/
 │       │   └── __tests__/       # API route tests
 │       └── services/
 │           └── __tests__/       # Service unit tests
-└── e2e/                         # Playwright E2E tests
+└── tests/
+    └── e2e/                     # Playwright E2E tests
 ```
 
 ## Unit Testing (Vitest)
@@ -210,7 +211,7 @@ export default defineConfig({
 ### E2E Test Examples
 
 ```typescript
-// e2e/chat.spec.ts
+// tests/e2e/chat.spec.ts
 import { test, expect } from '@playwright/test';
 
 test.describe('Chat Interface', () => {
@@ -251,7 +252,7 @@ test.describe('Chat Interface', () => {
 ### Testing SSE Streams
 
 ```typescript
-// e2e/streaming.spec.ts
+// tests/e2e/streaming.spec.ts
 import { test, expect } from '@playwright/test';
 
 test('should stream response in real-time', async ({ page }) => {

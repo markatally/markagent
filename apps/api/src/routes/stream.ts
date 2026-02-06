@@ -451,11 +451,60 @@ stream.get('/sessions/:sessionId/stream', async (c) => {
     content: m.content,
   }));
 
-  // Add system prompt if not present
-  if (!llmMessages.some((m) => m.role === 'system')) {
+  // === USER SKILL FILTERING (GET stream endpoint) ===
+  const registryGet = getDynamicSkillRegistry();
+  const traceIdGet = `trace-get-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+  const userEnabledSkillsGet = await registryGet.getEnabledSkillsForUser(user.userId, traceIdGet);
+  
+  // DEBUG: Log enabled skills for this request
+  console.log(`[SKILL_DEBUG] GET /stream - User ${user.userId} has ${userEnabledSkillsGet.length} enabled skills:`, 
+    userEnabledSkillsGet.map(s => s.name).join(', ') || 'NONE');
+
+  // Build system prompt with enabled skill capabilities
+  let systemPromptContentGet = 'You are a helpful AI assistant. Be concise and helpful.';
+  
+  if (userEnabledSkillsGet.length > 0) {
+    const skillDescriptionsGet = userEnabledSkillsGet
+      .map((skill) => `- ${skill.name}: ${skill.description}`)
+      .join('\n');
+    
+    systemPromptContentGet += `
+
+## CRITICAL: Your Available Skills
+
+The user has enabled ONLY these skills:
+
+${skillDescriptionsGet}
+
+IMPORTANT RULES:
+1. When the user asks "what can you do", "what skills do you have", or similar questions about your capabilities, you MUST list ONLY the skills shown above.
+2. Do NOT mention internal tools (like file_reader, file_writer, bash_executor, web_search, ppt_generator, etc.) - these are internal implementation details.
+3. Do NOT make up or invent capabilities beyond the enabled skills listed above.
+4. Do NOT list generic AI capabilities like "programming", "data analysis", "writing", etc. unless they are explicitly in the enabled skills list.
+5. If a skill is not in the list above, you do NOT have that capability.`;
+  } else {
+    systemPromptContentGet += `
+
+## CRITICAL: No Skills Enabled
+
+The user has not enabled any skills.
+
+IMPORTANT RULES:
+1. When the user asks "what can you do" or similar, explain that you are a general AI assistant but no specialized skills are currently enabled.
+2. Suggest they enable skills in the Skills settings (gear icon) to unlock specialized capabilities.
+3. Do NOT mention internal tools or make up capabilities.
+4. Do NOT list generic AI capabilities - you have no specialized skills enabled.`;
+  }
+
+  // Always use fresh system prompt with current skill list (skills may change mid-conversation)
+  const sysIdx = llmMessages.findIndex((m) => m.role === 'system');
+  if (sysIdx >= 0) {
+    // REPLACE existing system prompt entirely with fresh skill-enhanced one
+    llmMessages[sysIdx].content = systemPromptContentGet;
+  } else {
     llmMessages.unshift({
       role: 'system',
-      content: 'You are a helpful AI assistant. Be concise and helpful.',
+      content: systemPromptContentGet,
     });
   }
 
@@ -510,19 +559,17 @@ stream.get('/sessions/:sessionId/stream', async (c) => {
         content: m.content,
       }));
 
-      // Add or update system prompt with task context
+      // Add task context to existing system prompt (preserve skill info that was added earlier)
       const systemIndex = baseMessages.findIndex((m) => m.role === 'system');
-      const baseSystemPrompt = 'You are a helpful AI assistant. Be concise and helpful.';
-      const enhancedSystemPrompt = taskContext
-        ? `${baseSystemPrompt}\n\n${taskContext}`
-        : baseSystemPrompt;
-
-      if (systemIndex >= 0) {
-        baseMessages[systemIndex].content = enhancedSystemPrompt;
-      } else {
+      
+      if (systemIndex >= 0 && taskContext) {
+        // Append task context to existing system prompt (which already has skill info)
+        baseMessages[systemIndex].content += `\n\n${taskContext}`;
+      } else if (systemIndex < 0) {
+        // No system prompt exists - use the skill-enhanced one we built earlier
         baseMessages.unshift({
           role: 'system',
-          content: enhancedSystemPrompt,
+          content: systemPromptContentGet + (taskContext ? `\n\n${taskContext}` : ''),
         });
       }
 
@@ -587,6 +634,9 @@ stream.get('/sessions/:sessionId/stream', async (c) => {
 stream.post('/sessions/:sessionId/chat', async (c) => {
   const user = c.get('user');
   const sessionId = c.req.param('sessionId');
+  
+  // DEBUG: Confirm handler is executing
+  console.log(`\n${'='.repeat(60)}\n[SKILL_DEBUG] POST /chat HANDLER CALLED\n${'='.repeat(60)}`);
 
   // Parse request body
   let content: string;
@@ -678,6 +728,10 @@ stream.post('/sessions/:sessionId/chat', async (c) => {
   const registry = getDynamicSkillRegistry();
   const traceId = `trace-${Date.now()}-${Math.random().toString(36).substring(7)}`;
   const userEnabledSkills = await registry.getEnabledSkillsForUser(user.userId, traceId);
+  
+  // DEBUG: Log enabled skills for this request
+  console.log(`[SKILL_DEBUG] POST /chat - User ${user.userId} has ${userEnabledSkills.length} enabled skills:`, 
+    userEnabledSkills.map(s => s.name).join(', ') || 'NONE');
 
   // Guardrail: If no skills enabled, agent operates in LLM-only mode
   if (userEnabledSkills.length === 0) {
@@ -733,14 +787,62 @@ stream.post('/sessions/:sessionId/chat', async (c) => {
 
     // Restrict tools to skill's required tools
     skillTools = formatted.requiredTools;
+  }
+  
+  // Build system prompt with enabled skill capabilities (always build for fallback)
+  let systemPromptContent = 'You are a helpful AI assistant. Be concise and helpful.';
+  
+  // Add skill info to systemPromptContent (always, for fallback use)
+  if (userEnabledSkills.length > 0) {
+    const skillDescriptions = userEnabledSkills
+      .map((skill) => `- ${skill.name}: ${skill.description}`)
+      .join('\n');
+    
+    systemPromptContent += `
+
+## CRITICAL: Your Available Skills
+
+The user has enabled ONLY these skills:
+
+${skillDescriptions}
+
+IMPORTANT RULES:
+1. When the user asks "what can you do", "what skills do you have", or similar questions about your capabilities, you MUST list ONLY the skills shown above.
+2. Do NOT mention internal tools (like file_reader, file_writer, bash_executor, web_search, ppt_generator, etc.) - these are internal implementation details.
+3. Do NOT make up or invent capabilities beyond the enabled skills listed above.
+4. Do NOT list generic AI capabilities like "programming", "data analysis", "writing", etc. unless they are explicitly in the enabled skills list.
+5. If a skill is not in the list above, you do NOT have that capability.`;
   } else {
-    // Add default system prompt if not present
-    if (!llmMessages.some((m) => m.role === 'system')) {
+    systemPromptContent += `
+
+## CRITICAL: No Skills Enabled
+
+The user has not enabled any skills.
+
+IMPORTANT RULES:
+1. When the user asks "what can you do" or similar, explain that you are a general AI assistant but no specialized skills are currently enabled.
+2. Suggest they enable skills in the Skills settings (gear icon) to unlock specialized capabilities.
+3. Do NOT mention internal tools or make up capabilities.
+4. Do NOT list generic AI capabilities - you have no specialized skills enabled.`;
+  }
+  
+  // Only add to llmMessages if not using a skill invocation (skill invocation sets its own prompt)
+  if (!skillInvocation) {
+    // Always use fresh system prompt with current skill list (skills may change mid-conversation)
+    const systemIndex = llmMessages.findIndex((m) => m.role === 'system');
+    if (systemIndex >= 0) {
+      // REPLACE existing system prompt entirely with fresh skill-enhanced one
+      llmMessages[systemIndex].content = systemPromptContent;
+      console.log(`[SKILL_DEBUG] REPLACED system prompt at index ${systemIndex}`);
+    } else {
       llmMessages.unshift({
         role: 'system',
-        content: 'You are a helpful AI assistant. Be concise and helpful.',
+        content: systemPromptContent,
       });
+      console.log(`[SKILL_DEBUG] ADDED new system prompt`);
     }
+    // Log first 500 chars of system prompt
+    console.log(`[SKILL_DEBUG] System prompt (first 500 chars):\n${systemPromptContent.substring(0, 500)}...`);
   }
 
   // Truncate to fit context window
@@ -796,21 +898,26 @@ stream.post('/sessions/:sessionId/chat', async (c) => {
         content: m.content,
       }));
 
-      // Add or update system prompt with task context
-      const systemIndex = baseMessages.findIndex((m) => m.role === 'system');
-      const baseSystemPrompt = 'You are a helpful AI assistant. Be concise and helpful.';
-      const enhancedSystemPrompt = taskContext
-        ? `${baseSystemPrompt}\n\n${taskContext}`
-        : baseSystemPrompt;
-
-      if (systemIndex >= 0) {
-        baseMessages[systemIndex].content = enhancedSystemPrompt;
-      } else {
+      // Add task context to existing system prompt (preserve skill info that was added earlier)
+      const systemIndexChat = baseMessages.findIndex((m) => m.role === 'system');
+      
+      if (systemIndexChat >= 0 && taskContext) {
+        // Append task context to existing system prompt (which already has skill info)
+        baseMessages[systemIndexChat].content += `\n\n${taskContext}`;
+      } else if (systemIndexChat < 0) {
+        // No system prompt exists - use the skill-enhanced one we built earlier
         baseMessages.unshift({
           role: 'system',
-          content: enhancedSystemPrompt,
+          content: systemPromptContent + (taskContext ? `\n\n${taskContext}` : ''),
         });
       }
+
+      // DEBUG: Log all messages being sent to LLM
+      console.log(`[SKILL_DEBUG] Messages being sent to LLM (${baseMessages.length} total):`);
+      baseMessages.forEach((m, i) => {
+        const preview = m.content.substring(0, 200).replace(/\n/g, '\\n');
+        console.log(`  [${i}] ${m.role}: ${preview}...`);
+      });
 
       // Process agent turn with continuation loop
       const result = await processAgentTurn(

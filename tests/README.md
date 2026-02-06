@@ -2,6 +2,12 @@
 
 This directory contains all tests for the Mark Agent project.
 
+## Quick Links
+
+- **[Skills Testing Guide](./SKILLS_TESTING.md)** - Comprehensive guide for skills feature tests
+- **[Skills Test Summary](./TEST_SUMMARY.md)** - Quick reference for skills test suite  
+- **[E2E Testing Guide](./e2e/README.md)** - Playwright E2E testing setup
+
 ## Directory Structure
 
 ```

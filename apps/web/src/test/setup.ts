@@ -25,3 +25,21 @@ const localStorageMock = {
 };
 
 globalThis.localStorage = localStorageMock as any;
+
+// Mock ResizeObserver for virtualization
+globalThis.ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+
+// Mock element measurements for virtualization
+Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+  configurable: true,
+  value: 600,
+});
+
+Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+  configurable: true,
+  value: 800,
+});
