@@ -15,6 +15,13 @@ export interface TokenPayload {
   type: 'access' | 'refresh';
 }
 
+export interface DownloadTokenPayload {
+  userId: string;
+  sessionId: string;
+  fileId: string;
+  type: 'download';
+}
+
 /**
  * Hash a password using bcrypt
  */
@@ -82,4 +89,33 @@ export function generateTokenPair(userId: string, email: string) {
     accessToken: generateAccessToken(userId, email),
     refreshToken: generateRefreshToken(userId, email),
   };
+}
+
+/**
+ * Generate JWT download token (60 seconds)
+ * Used for temporary file download URLs
+ */
+export function generateDownloadToken(userId: string, sessionId: string, fileId: string): string {
+  const payload: DownloadTokenPayload = {
+    userId,
+    sessionId,
+    fileId,
+    type: 'download',
+  };
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '60s' });
+}
+
+/**
+ * Verify and decode a download token
+ */
+export function verifyDownloadToken(token: string): DownloadTokenPayload {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as DownloadTokenPayload;
+    if (decoded.type !== 'download') {
+      throw new Error('Invalid token type');
+    }
+    return decoded;
+  } catch (error) {
+    throw new Error('Invalid or expired download token');
+  }
 }

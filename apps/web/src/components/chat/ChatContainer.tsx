@@ -1,11 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { MessageList } from './MessageList';
+import { DocumentCanvas } from '../canvas/DocumentCanvas';
 import { ChatInput } from './ChatInput';
-import { ToolCallDisplay } from './ToolCallDisplay';
-import { ArtifactDisplay } from './ArtifactDisplay';
-import { SkillsConfigModal } from '../skills/SkillsConfigModal';
 import { apiClient, type SSEEvent, ApiError } from '../../lib/api';
 import { useChatStore } from '../../stores/chatStore';
 import { useSession } from '../../hooks/useSessions';
@@ -13,13 +10,15 @@ import { useToast } from '../../hooks/use-toast';
 
 interface ChatContainerProps {
   sessionId: string;
+  onOpenSkills?: () => void;
 }
 
-export function ChatContainer({ sessionId }: ChatContainerProps) {
+export function ChatContainer({ sessionId, onOpenSkills }: ChatContainerProps) {
+  const location = useLocation();
   const [isSending, setIsSending] = useState(false);
-  const [files, setFiles] = useState<import('@mark/shared').Artifact[]>([]);
-  const [skillsModalOpen, setSkillsModalOpen] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const initialMessageHandledRef = useRef(false);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -27,6 +26,7 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
   // Verify session exists before allowing any operations
   const { data: session, isLoading: isSessionLoading, error: sessionError } = useSession(sessionId);
   const isSessionValid = !!session && !sessionError;
+  const initialMessage = (location.state as { initialMessage?: string } | null)?.initialMessage;
 
   const addMessage = useChatStore((state) => state.addMessage);
   const startStreaming = useChatStore((state) => state.startStreaming);
@@ -43,13 +43,20 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
   const completeTableBlock = useChatStore((state) => state.completeTableBlock);
   const clearTables = useChatStore((state) => state.clearTables);
   const clearToolCalls = useChatStore((state) => state.clearToolCalls);
+  const addReasoningStep = useChatStore((state) => state.addReasoningStep);
+  const updateReasoningStep = useChatStore((state) => state.updateReasoningStep);
+  const completeReasoningStep = useChatStore((state) => state.completeReasoningStep);
+  const clearReasoningSteps = useChatStore((state) => state.clearReasoningSteps);
+  const setInspectorTab = useChatStore((state) => state.setInspectorTab);
+  const setSelectedMessageId = useChatStore((state) => state.setSelectedMessageId);
+  const associateToolCallsWithMessage = useChatStore((state) => state.associateToolCallsWithMessage);
 
-  // Clear tool calls, tables, and files when session changes
+  // Clear tool calls, tables, and message selection when session changes
   useEffect(() => {
     clearToolCalls();
     clearTables();
-    setFiles([]);
-  }, [sessionId, clearToolCalls, clearTables]);
+    setSelectedMessageId(null);
+  }, [sessionId, clearToolCalls, clearTables, setSelectedMessageId]);
 
   // Scroll to bottom helper
   const scrollToBottom = () => {
@@ -67,6 +74,8 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
     switch (event.type) {
       case 'message.start':
         startStreaming(sessionId);
+        clearReasoningSteps(sessionId);
+        setInspectorTab('reasoning');
         break;
 
       case 'message.delta':
@@ -76,6 +85,9 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
         break;
 
       case 'message.complete':
+        if (event.data?.assistantMessageId) {
+          associateToolCallsWithMessage(sessionId, event.data.assistantMessageId);
+        }
         stopStreaming();
         // Refetch messages to ensure we have the latest
         queryClient.invalidateQueries({ queryKey: ['sessions', sessionId, 'messages'] });
@@ -91,6 +103,7 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
           // Turn off thinking indicator since tool card provides visual feedback
           setThinking(false);
           startToolCall(
+            sessionId,
             event.data.toolCallId,
             event.data.toolName,
             event.data.params || event.data.parameters
@@ -104,8 +117,10 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
             success: true,
             output: event.data.result || '',
             duration: event.data.duration || 0,
+            artifacts: event.data.artifacts,
           };
           completeToolCall(event.data.toolCallId, toolResult);
+          completeReasoningStep(sessionId, `tool-${event.data.toolCallId}`, Date.now());
         }
         break;
 
@@ -118,21 +133,63 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
             duration: event.data.duration || 0,
           };
           completeToolCall(event.data.toolCallId, toolResult);
+          completeReasoningStep(sessionId, `tool-${event.data.toolCallId}`, Date.now());
         }
         break;
 
-      case 'file.created':
-        // File artifact created - add to local state for display
-        if (event.data?.fileId && event.data?.filename) {
-          const artifact: import('@mark/shared').Artifact = {
-            fileId: event.data.fileId,
-            name: event.data.filename,
-            type: event.data.type || 'file',
-            mimeType: event.data.mimeType,
-            size: event.data.size,
-            content: '',
-          };
-          setFiles((prev) => [...prev, artifact]);
+      case 'reasoning.step':
+        if (event.data) {
+          const existingSteps = useChatStore.getState().reasoningSteps.get(sessionId) || [];
+          const alreadyTracked = existingSteps.some((s) => s.stepId === event.data.stepId);
+          const thinkingContent = event.data.thinkingContent;
+
+          if (event.data.status === 'running') {
+            if (!alreadyTracked) {
+              addReasoningStep(sessionId, {
+                stepId: event.data.stepId,
+                label: event.data.label,
+                status: 'running',
+                startedAt: Date.now(),
+                message: event.data.message,
+                thinkingContent,
+                details: event.data.details,
+              });
+            } else {
+              updateReasoningStep(sessionId, event.data.stepId, {
+                label: event.data.label,
+                status: 'running',
+                message: event.data.message,
+                ...(thinkingContent ? { thinkingContent } : {}),
+                details: event.data.details,
+              });
+            }
+          }
+
+          if (event.data.status === 'completed') {
+            if (!alreadyTracked) {
+              addReasoningStep(sessionId, {
+                stepId: event.data.stepId,
+                label: event.data.label,
+                status: 'completed',
+                startedAt: Date.now(),
+                completedAt: Date.now(),
+                durationMs: event.data.durationMs,
+                message: event.data.message,
+                thinkingContent,
+                details: event.data.details,
+              });
+            } else {
+              updateReasoningStep(sessionId, event.data.stepId, {
+                label: event.data.label,
+                status: 'completed',
+                completedAt: Date.now(),
+                durationMs: event.data.durationMs,
+                message: event.data.message,
+                ...(thinkingContent ? { thinkingContent } : {}),
+                details: event.data.details,
+              });
+            }
+          }
         }
         break;
 
@@ -174,6 +231,8 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
     }
 
     setIsSending(true);
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
 
     try {
       // Add optimistic user message
@@ -197,13 +256,21 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
       setIsSending(false);
 
       // Stream response from backend
-      for await (const event of apiClient.chat.sendAndStream(sessionId, content)) {
+      for await (const event of apiClient.chat.sendAndStream(
+        sessionId,
+        content,
+        abortControllerRef.current.signal
+      )) {
         handleSSEEvent(event);
       }
 
-      // Refetch messages after stream completes
-      queryClient.invalidateQueries({ queryKey: ['sessions', sessionId, 'messages'] });
+      // Note: message.complete handler already invalidates queries, no need to duplicate here
     } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        stopStreaming();
+        setIsSending(false);
+        return;
+      }
       stopStreaming();
       setIsSending(false);
       toast({
@@ -212,6 +279,30 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
         variant: 'destructive',
       });
     }
+  };
+
+  useEffect(() => {
+    if (!initialMessage || initialMessageHandledRef.current) return;
+    if (isSessionLoading || !isSessionValid) return;
+    if (isStreaming || isSending) return;
+
+    initialMessageHandledRef.current = true;
+    handleSendMessage(initialMessage);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [
+    initialMessage,
+    isSessionLoading,
+    isSessionValid,
+    isStreaming,
+    isSending,
+    navigate,
+    location.pathname,
+  ]);
+
+  const handleStopStreaming = () => {
+    abortControllerRef.current?.abort();
+    stopStreaming();
+    setIsSending(false);
   };
 
   // Redirect to chat list if session doesn't exist or failed to load
@@ -251,34 +342,17 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      {/* Scrollable content area */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
-        <MessageList sessionId={sessionId} />
-        <ToolCallDisplay sessionId={sessionId} />
-
-        {/* Display generated files in the scrollable area */}
-        {files.length > 0 && (
-          <div className="p-4 border-t bg-muted/20">
-            <div className="text-xs font-medium text-muted-foreground mb-2">
-              Generated Files ({files.length})
-            </div>
-            {files.map((file, idx) => (
-              <ArtifactDisplay key={idx} artifact={file} sessionId={sessionId} />
-            ))}
-          </div>
-        )}
-      </div>
+      <DocumentCanvas sessionId={sessionId} scrollContainerRef={scrollContainerRef} />
 
       {/* Input always at the bottom */}
-      <ChatInput 
-        onSend={handleSendMessage} 
-        disabled={isSending || !isSessionValid}
+      <ChatInput
+        onSend={handleSendMessage}
+        disabled={isSending || (!isSessionValid && !isSessionLoading)}
         sendDisabled={isStreaming}
-        onSkillsClick={() => setSkillsModalOpen(true)}
+        onStop={handleStopStreaming}
+        onOpenSkills={onOpenSkills}
       />
 
-      {/* Skills configuration modal */}
-      <SkillsConfigModal open={skillsModalOpen} onOpenChange={setSkillsModalOpen} />
     </div>
   );
 }

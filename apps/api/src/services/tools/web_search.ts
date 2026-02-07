@@ -1,45 +1,26 @@
 /**
- * Web Search Tool - Research-grade academic paper discovery
- * Uses open-source PaperSearchSkills (arXiv, Semantic Scholar, CrossRef) and
- * orchestration: merge, dedupe by title/DOI, date resolution via tools only.
- * LLM must never hallucinate papers, venues, or dates; use tool output only.
- * 
- * TIME-RANGE ENFORCEMENT:
- * - User time expressions are parsed into structured AbsoluteDateWindow
- * - Strict time ranges (e.g., "last 1 month") are NEVER expanded on retry
- * - Post-search validation filters out any papers outside the window
+ * Web Search Tool - General internet search (news, articles, docs)
+ * Uses Tavily for AI-friendly web search. Falls back to Brave Search if needed.
  */
 
 import type { Tool, ToolContext, ToolResult } from './types';
-import {
-  getPaperSearchSkill,
-  createPaperSearchOrchestrator,
-  CrossRefResolverSkill,
-  DEFAULT_PAPER_SEARCH_SKILL_IDS,
-} from '../paper-search';
-import type { ResolvedPaper, AbsoluteDateWindow } from '../paper-search';
-import {
-  parseDateRangeString,
-  filterPapersByDateWindow,
-  intentToAbsoluteDateWindow,
-  isStrictTimeRange,
-  describeTimeWindow,
-} from '../paper-search/time-range-parser';
 
-type SearchSource = 'arxiv' | 'semantic_scholar' | 'all';
+type SearchTopic = 'general' | 'news';
+type SearchDepth = 'basic' | 'advanced';
 
-const SOURCE_TO_SKILL_IDS: Record<SearchSource, string[]> = {
-  arxiv: ['arxiv'],
-  semantic_scholar: ['semantic_scholar'],
-  all: [...DEFAULT_PAPER_SEARCH_SKILL_IDS],
+type WebSearchResult = {
+  title: string;
+  url: string;
+  content?: string;
+  score?: number;
+  publishedDate?: string;
+  source?: string;
 };
-
-type PaperSearchOrchestrator = ReturnType<typeof createPaperSearchOrchestrator>;
 
 export class WebSearchTool implements Tool {
   name = 'web_search';
   description =
-    'Search academic papers using open-source APIs (arXiv, Semantic Scholar). Returns structured metadata including title, authors, publication date (resolved from APIs only), venue, DOI, and links. Results are merged and deduplicated across sources; publication dates are resolved via CrossRef > arXiv v1 > Semantic Scholar. Do not invent papers, venues, or dates—use only the returned results. IMPORTANT: Do NOT add year ranges (like "2023 2024") to the query text - the APIs return recent papers by default. Use only topic keywords for the query parameter.';
+    'Search the internet for current information, news, articles, documentation, and general web content. Returns relevant web pages with titles, URLs, and content snippets. Use topic "news" for current events.';
   requiresConfirmation = false;
   timeout = 60000;
 
@@ -48,55 +29,33 @@ export class WebSearchTool implements Tool {
     properties: {
       query: {
         type: 'string' as const,
-        description: 'Search query for finding papers. Use topic keywords only (e.g., "AI agents", "transformer architecture"). Do NOT include year ranges like "2023 2024" - the APIs return recent papers by default.',
+        description: 'Search query for finding web results (e.g., "AI agent news", "model context protocol").',
       },
-      sources: {
+      topic: {
         type: 'string' as const,
-        description: 'Sources to search: arxiv, semantic_scholar, all (default: all)',
-        enum: ['arxiv', 'semantic_scholar', 'all'],
+        description: 'Search topic: general or news (default: general)',
+        enum: ['general', 'news'],
       },
-      topK: {
+      maxResults: {
         type: 'number' as const,
-        description: 'Number of results to return (default: 5, max: 20)',
+        description: 'Number of results to return (default: 5, max: 10)',
         minimum: 1,
-        maximum: 20,
+        maximum: 10,
       },
-      dateRange: {
-        type: 'string' as const,
-        description: 'Optional date range filter. IMPORTANT: Use EXACTLY the time range the user specified. Examples: "last-1-month" (for "last 1 month" or "past month"), "last-2-weeks", "last-3-months", "last-1-year", "2020-2024". The format is "last-N-unit" where N is the number and unit is days/weeks/months/years. Do NOT round up or expand the time range.',
-      },
-      sortBy: {
-        type: 'string' as const,
-        description: 'Sort order: relevance, date, citations (default: relevance)',
-        enum: ['relevance', 'date', 'citations'],
-      },
-      enableRetry: {
+      includeContent: {
         type: 'boolean' as const,
-        description: 'Retry with broader query if no results (default: true)',
+        description: 'Whether to include content snippets (default: true)',
       },
-      maxRetries: {
-        type: 'number' as const,
-        description: 'Max retry attempts (default: 2)',
-        minimum: 0,
-        maximum: 5,
+      searchDepth: {
+        type: 'string' as const,
+        description: 'Search depth: basic or advanced (default: basic)',
+        enum: ['basic', 'advanced'],
       },
     },
     required: ['query'],
   };
 
-  private runOrchestrator: PaperSearchOrchestrator;
-
-  constructor(
-    private context: ToolContext,
-    deps?: { runOrchestrator?: PaperSearchOrchestrator }
-  ) {
-    this.runOrchestrator =
-      deps?.runOrchestrator ??
-      createPaperSearchOrchestrator({
-        getSkill: (id) => getPaperSearchSkill(id),
-        crossrefSkill: CrossRefResolverSkill,
-      });
-  }
+  constructor(private context: ToolContext) {}
 
   async execute(
     params: Record<string, unknown>,
@@ -104,184 +63,77 @@ export class WebSearchTool implements Tool {
   ): Promise<ToolResult> {
     const startTime = Date.now();
     const query = String(params.query ?? '').trim();
-    try {
-      const sourcesParam = (params.sources as SearchSource) || 'all';
-      const parsedTopK = Number(
-        params.topK ?? params.maxResults
-      );
-      const exceededTopK = Number.isFinite(parsedTopK) && parsedTopK > 20;
-      const topK = Math.min(
-        Math.max(Number.isFinite(parsedTopK) ? parsedTopK : 5, 1),
-        20
-      );
-      const sortBy = (params.sortBy as string) || 'relevance';
-      const dateRange = params.dateRange as string | undefined;
-      const enableRetry = params.enableRetry !== false;
-      const maxRetries = Math.min(Math.max(Number(params.maxRetries) || 2, 0), 5);
+    if (!query) {
+      return {
+        success: false,
+        output: '',
+        error: 'Query is required and must be a non-empty string',
+        duration: Date.now() - startTime,
+      };
+    }
 
-      if (!query) {
+    const topic = (params.topic as SearchTopic) || 'general';
+    const maxResultsRaw = Number(params.maxResults);
+    const maxResults = Math.min(
+      Math.max(Number.isFinite(maxResultsRaw) ? maxResultsRaw : 5, 1),
+      10
+    );
+    const includeContent = params.includeContent !== false;
+    const searchDepth = (params.searchDepth as SearchDepth) || 'basic';
+
+    onProgress?.(0, 100, 'Preparing web search...');
+
+    try {
+      const tavilyKey = process.env.TAVILY_API_KEY;
+      const braveKey = process.env.BRAVE_SEARCH_API_KEY;
+
+      if (!tavilyKey && !braveKey) {
         return {
           success: false,
-          output: '',
-          error: 'Query is required and must be a non-empty string',
+          output: 'Web search requires a TAVILY_API_KEY or BRAVE_SEARCH_API_KEY. Please configure one in your .env file.',
+          error: 'Missing web search API keys',
           duration: Date.now() - startTime,
         };
       }
 
-      // ============================================================
-      // PRE-SEARCH VALIDATION GATE: Parse time range into absolute window
-      // WHY: Convert relative time ("last 1 month") to absolute dates ONCE
-      // This prevents time-range drift during retries
-      // ============================================================
-      let absoluteDateWindow: AbsoluteDateWindow | undefined;
-      if (dateRange) {
-        const intent = parseDateRangeString(dateRange);
-        absoluteDateWindow = intent ? intentToAbsoluteDateWindow(intent) : undefined;
-        if (absoluteDateWindow) {
-          console.log(`[WebSearchTool] Time range parsed: ${describeTimeWindow(absoluteDateWindow)}`);
-        }
-      }
+      let results: WebSearchResult[] = [];
+      let provider = 'tavily';
 
-      onProgress?.(0, 100, 'Preparing search...');
-      const skillIds = SOURCE_TO_SKILL_IDS[sourcesParam] ?? DEFAULT_PAPER_SEARCH_SKILL_IDS;
-
-      onProgress?.(10, 100, `Searching ${skillIds.length} source(s)...`);
-      let out = await this.runOrchestrator({
-        query,
-        skillIds,
-        limit: topK,
-        sortBy: sortBy as 'relevance' | 'date' | 'citations',
-        dateRange,
-        absoluteDateWindow, // Pass absolute window for query-time filtering
-      });
-
-      let searchAttempt = 1;
-      let usedFallback = false;
-      
-      // ============================================================
-      // RETRY LOGIC WITH STRICT TIME RANGE ENFORCEMENT
-      // WHY: If time range is strict, we NEVER expand or remove it
-      // This is the key fix for the "last 1 month -> 12 months" bug
-      // ============================================================
-      const isStrict = isStrictTimeRange(absoluteDateWindow);
-      
-      if (out.papers.length === 0 && enableRetry) {
-        onProgress?.(40, 100, 'No results found, trying broader search...');
-        const reformulated = this.reformulateQuery(query);
-        for (const q of reformulated) {
-          if (searchAttempt > maxRetries) break;
-          searchAttempt++;
-          onProgress?.(40 + searchAttempt * 10, 100, `Trying alternative query (${searchAttempt}/${maxRetries + 1})...`);
-          
-          // CRITICAL FIX: If strict time range, NEVER remove the date filter
-          // Previously: dateRange: usedFallback ? undefined : dateRange
-          // This caused "last 1 month" to silently expand to "all time"
-          const retryDateRange = isStrict ? dateRange : (usedFallback ? undefined : dateRange);
-          const retryDateWindow = isStrict ? absoluteDateWindow : (usedFallback ? undefined : absoluteDateWindow);
-          
-          const next = await this.runOrchestrator({
-            query: q,
-            skillIds,
-            limit: topK,
-            sortBy: sortBy as 'relevance' | 'date' | 'citations',
-            dateRange: retryDateRange,
-            absoluteDateWindow: retryDateWindow,
-          });
-          out = {
-            papers: [...out.papers, ...next.papers],
-            sourcesQueried: [...new Set([...out.sourcesQueried, ...next.sourcesQueried])],
-            sourcesSkipped: [...new Set([...out.sourcesSkipped, ...next.sourcesSkipped])],
-            exclusionReasons: [...out.exclusionReasons, ...next.exclusionReasons],
-          };
-          if (out.papers.length > 0) {
-            usedFallback = true;
-            break;
-          }
-          usedFallback = true;
-        }
-      }
-      
-      // ============================================================
-      // POST-SEARCH VERIFICATION: Filter papers by date window
-      // WHY: Even if the API returns papers outside the window, we filter them
-      // This is the final gate that ensures strict time compliance
-      // ============================================================
-      let dateFilteredCount = 0;
-      if (absoluteDateWindow && out.papers.length > 0) {
-        const evaluated = filterPapersByDateWindow(out.papers, absoluteDateWindow);
-        const filtered = evaluated.filter((paper) => paper.included);
-        const reasons = evaluated
-          .filter((paper) => !paper.included)
-          .map((paper) => paper.exclusionReason)
-          .filter((reason): reason is string => !!reason);
-        dateFilteredCount = out.papers.length - filtered.length;
-        out.papers = filtered.map((paper) => {
-          const { included, exclusionReason, ...rest } = paper as ResolvedPaper & {
-            included: boolean;
-            exclusionReason?: string;
-          };
-          return rest;
+      if (tavilyKey) {
+        onProgress?.(20, 100, 'Searching the web (Tavily)...');
+        results = await this.searchWithTavily({
+          apiKey: tavilyKey,
+          query,
+          topic,
+          maxResults,
+          includeContent,
+          searchDepth,
         });
-        if (reasons.length > 0) {
-          out.exclusionReasons.push(...reasons.slice(0, 5)); // Limit to avoid noise
-          if (dateFilteredCount > 0) {
-            out.exclusionReasons.push(
-              `${dateFilteredCount} paper(s) excluded: outside time window [${absoluteDateWindow.startDate} to ${absoluteDateWindow.endDate}]`
-            );
-          }
-        }
+      } else if (braveKey) {
+        provider = 'brave';
+        onProgress?.(20, 100, 'Searching the web (Brave)...');
+        results = await this.searchWithBrave({
+          apiKey: braveKey,
+          query,
+          topic,
+          maxResults,
+          includeContent,
+        });
       }
 
-      onProgress?.(70, 100, 'Processing results...');
-      const papers = out.papers.slice(0, topK);
-      onProgress?.(90, 100, 'Formatting output...');
+      onProgress?.(80, 100, 'Formatting results...');
+      const output = this.formatResults(query, results, provider);
 
-      const output = this.formatResults(
-        papers,
-        query,
-        skillIds,
-        sortBy,
-        searchAttempt > 1,
-        usedFallback,
-        out.sourcesSkipped,
-        out.exclusionReasons,
-        exceededTopK
-      );
-
-      // CRITICAL: Zero results is NOT an error - it's informational
-      // The agent should use this information to trigger recovery strategies
-      // rather than treating it as a fatal failure
       const artifactPayload = {
         query,
-        originalQuery: query,
-        sources: skillIds,
-        sourcesQueried: out.sourcesQueried,
-        sourcesSkipped: out.sourcesSkipped,
-        searchAttempts: searchAttempt,
-        usedFallback,
-        sortBy,
-        topK,
-        results: papers,
-        exclusionReasons: out.exclusionReasons,
-        // Time range enforcement metadata
-        timeRange: absoluteDateWindow ? {
-          startDate: absoluteDateWindow.startDate,
-          endDate: absoluteDateWindow.endDate,
-          strict: absoluteDateWindow.strict,
-          papersFilteredByDate: dateFilteredCount,
-        } : undefined,
-        // Explicit flag for downstream consumers
-        zeroResults: papers.length === 0,
-        suggestion: papers.length === 0 
-          ? (isStrict 
-              ? `No papers found within the strict time window [${absoluteDateWindow?.startDate} to ${absoluteDateWindow?.endDate}]. The time constraint was enforced as requested.`
-              : 'Try broader terms, remove date filters, or reformulate the query')
-          : undefined,
+        topic,
+        provider,
+        maxResults,
+        results,
+        zeroResults: results.length === 0,
       };
 
       return {
-        // RECALL-PERMISSIVE: Always return success to allow agent to continue
-        // Zero results triggers recovery strategies, not agent termination
         success: true,
         output,
         duration: Date.now() - startTime,
@@ -293,106 +145,125 @@ export class WebSearchTool implements Tool {
             mimeType: 'application/json',
           },
         ],
-        // Provide informational warning (not error) for zero results
-        ...(papers.length === 0 && {
-          warning: `No papers found for query "${query}". Consider reformulating the query.`,
+        ...(results.length === 0 && {
+          warning: `No web results found for query "${query}". Consider refining the query.`,
         }),
       };
     } catch (error: unknown) {
-      // Network/API errors should still be reported, but as recoverable
       return {
-        success: true, // Still allow agent to continue
-        output: `Search encountered an error: ${error instanceof Error ? error.message : String(error)}. The agent may try alternative strategies.`,
+        success: false,
+        output: `Web search failed: ${error instanceof Error ? error.message : String(error)}`,
         error: error instanceof Error ? error.message : String(error),
         duration: Date.now() - startTime,
-        artifacts: [
-          {
-            type: 'data',
-            name: 'search-results.json',
-            content: JSON.stringify({
-              query,
-              results: [],
-              zeroResults: true,
-              searchError: error instanceof Error ? error.message : String(error),
-              suggestion: 'Search failed; agent should try alternative queries or sources',
-            }, null, 2),
-            mimeType: 'application/json',
-          },
-        ],
       };
     }
   }
 
-  private reformulateQuery(original: string): string[] {
-    const cleaned = original
-      .replace(/^(papers? about|research on|find|search for|looking for|i need|find me)\s+/i, '')
-      .replace(/\s+(papers?|research|articles?)$/i, '')
-      .trim();
-    const out: string[] = cleaned !== original ? [cleaned] : [];
-    const stop = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from']);
-    const terms = original
-      .split(/\s+/)
-      .filter((w) => w.length > 2 && !stop.has(w.toLowerCase()))
-      .join(' ');
-    if (terms !== cleaned && terms.length > 3) out.push(terms);
-    if (original.includes('"')) out.push(original.replace(/"/g, ''));
-    return out;
+  private async searchWithTavily(input: {
+    apiKey: string;
+    query: string;
+    topic: SearchTopic;
+    maxResults: number;
+    includeContent: boolean;
+    searchDepth: SearchDepth;
+  }): Promise<WebSearchResult[]> {
+    const response = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: input.apiKey,
+        query: input.query,
+        topic: input.topic,
+        search_depth: input.searchDepth,
+        max_results: input.maxResults,
+        include_answer: false,
+        include_raw_content: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Tavily search failed (${response.status}): ${text}`);
+    }
+
+    const data = await response.json();
+    const results = Array.isArray(data?.results) ? data.results : [];
+    return results.map((item: any) => ({
+      title: String(item.title ?? ''),
+      url: String(item.url ?? ''),
+      content: input.includeContent ? String(item.content ?? '') : undefined,
+      score: typeof item.score === 'number' ? item.score : undefined,
+      publishedDate: item.published_date ? String(item.published_date) : undefined,
+      source: 'tavily',
+    })).filter((item: WebSearchResult) => item.title && item.url);
   }
 
-  private formatResults(
-    results: ResolvedPaper[],
-    query: string,
-    sources: string[],
-    sortBy: string,
-    usedRetry: boolean,
-    usedFallback: boolean,
-    sourcesSkipped: string[],
-    exclusionReasons: string[],
-    suppressDetails: boolean
-  ): string {
+  private async searchWithBrave(input: {
+    apiKey: string;
+    query: string;
+    topic: SearchTopic;
+    maxResults: number;
+    includeContent: boolean;
+  }): Promise<WebSearchResult[]> {
+    const endpoint = input.topic === 'news'
+      ? 'https://api.search.brave.com/res/v1/news/search'
+      : 'https://api.search.brave.com/res/v1/web/search';
+    const params = new URLSearchParams({
+      q: input.query,
+      count: String(input.maxResults),
+    });
+
+    const response = await fetch(`${endpoint}?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        'X-Subscription-Token': input.apiKey,
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Brave search failed (${response.status}): ${text}`);
+    }
+
+    const data = await response.json();
+    const results = input.topic === 'news'
+      ? (Array.isArray(data?.results) ? data.results : [])
+      : (Array.isArray(data?.web?.results) ? data.web.results : []);
+
+    return results.map((item: any) => ({
+      title: String(item.title ?? ''),
+      url: String(item.url ?? ''),
+      content: input.includeContent
+        ? String(item.description ?? item.snippet ?? item.extra_snippets?.[0] ?? '')
+        : undefined,
+      score: typeof item.score === 'number' ? item.score : undefined,
+      publishedDate: item.published_time ? String(item.published_time) : undefined,
+      source: 'brave',
+    })).filter((item: WebSearchResult) => item.title && item.url);
+  }
+
+  private formatResults(query: string, results: WebSearchResult[], provider: string): string {
     if (results.length === 0) {
-      let text = `🔍 Search Results for: "${query}"\n📊 No papers found\n`;
-      text += `📌 Sources attempted: ${sources.join(', ')} | Sort: ${sortBy}\n`;
-      if (sourcesSkipped.length) text += `⚠️ Skipped: ${sourcesSkipped.join(', ')}\n`;
-      text += '='.repeat(60) + '\n\n💡 Try broader terms, remove filters, or check spelling.';
-      return text;
+      return `Web Search Results for: "${query}"\nNo results found.\nProvider: ${provider}`;
     }
 
-    let text = `🔍 Search Results for: "${query}"\n`;
-    text += `📊 ${results.length} papers | Sources: ${sources.join(', ')} | Sort: ${sortBy}`;
-    if (usedRetry) text += ' | Retry: used';
-    if (usedFallback) text += ' | Fallback: used';
-    text += '\n';
-    if (sourcesSkipped.length) text += `⚠️ Skipped: ${sourcesSkipped.join(', ')}\n`;
-    if (exclusionReasons.length) text += `📋 Notes: ${exclusionReasons.slice(0, 3).join('; ')}\n`;
+    let text = `Web Search Results for: "${query}"\n`;
+    text += `Results: ${results.length} | Provider: ${provider}\n`;
     text += '='.repeat(60) + '\n\n';
-    if (suppressDetails) {
-      text += 'Results omitted due to requested limit exceeding max (20).';
-      text += '\n\n' + '='.repeat(60) + '\n💡 Use only these results; do not invent papers, venues, or dates.';
-      return text;
-    }
 
-    results.forEach((paper, i) => {
-      text += `Result ${i + 1}/${results.length}:\n`;
-      text += `📄 Title: ${paper.title}\n`;
-      text += `✍️  Authors: ${paper.authors.join(', ')}\n`;
-      if (paper.publicationDate) {
-        text += `📅 Date: ${paper.publicationDate}`;
-        if (paper.publicationDateSource) text += ` (source: ${paper.publicationDateSource})`;
-        if (paper.publicationDateConfidence) text += ` [${paper.publicationDateConfidence}]`;
-        text += '\n';
-      }
-      if (paper.venue) text += `🏛️  Venue: ${paper.venue}\n`;
-      if (paper.citationCount != null) text += `📎 Citations: ${paper.citationCount}\n`;
-      if (paper.doi) text += `🔗 DOI: ${paper.doi}\n`;
-      text += `🔗 Link: ${paper.link}\n`;
-      text += `📌 Source: ${paper.source}\n`;
-      if (paper.abstract) text += `\n📝 Summary:\n${paper.abstract.slice(0, 500)}${paper.abstract.length > 500 ? '...' : ''}\n`;
-      if (paper.exclusionReasons?.length) text += `⚠️ Notes: ${paper.exclusionReasons.join('; ')}\n`;
+    results.forEach((result, index) => {
+      text += `Result ${index + 1}/${results.length}:\n`;
+      text += `Title: ${result.title}\n`;
+      text += `URL: ${result.url}\n`;
+      if (result.publishedDate) text += `Published: ${result.publishedDate}\n`;
+      if (result.content) text += `Snippet: ${result.content}\n`;
+      if (result.score != null) text += `Score: ${result.score}\n`;
+      if (result.source) text += `Source: ${result.source}\n`;
       text += '\n' + '-'.repeat(40) + '\n\n';
     });
 
-    text += '='.repeat(60) + '\n💡 Use only these results; do not invent papers, venues, or dates.';
+    text += '='.repeat(60);
     return text;
   }
 }

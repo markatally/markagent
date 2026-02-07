@@ -179,7 +179,7 @@ export function InteractiveTable({ table, isStreaming = false }: InteractiveTabl
   };
 
   return (
-    <div className="my-1 w-full overflow-x-auto rounded-md border border-border">
+    <div className="not-prose my-4 w-full overflow-x-auto rounded-md border border-border">
       {caption && (
         <div className="px-4 py-2 bg-muted/30 border-b border-border font-medium text-sm">
           {caption}

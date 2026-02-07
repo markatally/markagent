@@ -29,6 +29,11 @@ export function useSSE({ sessionId, enabled, onComplete, onError }: UseSSEOption
   const startToolCall = useChatStore((state) => state.startToolCall);
   const updateToolCallProgress = useChatStore((state) => state.updateToolCallProgress);
   const completeToolCall = useChatStore((state) => state.completeToolCall);
+  const associateToolCallsWithMessage = useChatStore((state) => state.associateToolCallsWithMessage);
+  const addReasoningStep = useChatStore((state) => state.addReasoningStep);
+  const updateReasoningStep = useChatStore((state) => state.updateReasoningStep);
+  const completeReasoningStep = useChatStore((state) => state.completeReasoningStep);
+  const clearReasoningSteps = useChatStore((state) => state.clearReasoningSteps);
   const addFileArtifact = useChatStore((state) => state.addFileArtifact);
   const stopStreaming = useChatStore((state) => state.stopStreaming);
   const finalizeStreamingMessage = useChatStore((state) => state.finalizeStreamingMessage);
@@ -73,6 +78,7 @@ export function useSSE({ sessionId, enabled, onComplete, onError }: UseSSEOption
         switch (event.type) {
           case 'message.start':
             startStreaming(sessionId);
+            clearReasoningSteps(sessionId);
             break;
 
           case 'message.delta':
@@ -82,6 +88,9 @@ export function useSSE({ sessionId, enabled, onComplete, onError }: UseSSEOption
             break;
 
           case 'message.complete':
+            if (event.data?.assistantMessageId) {
+              associateToolCallsWithMessage(sessionId, event.data.assistantMessageId);
+            }
             if (event.data?.message) {
               finalizeStreamingMessage(event.data.message.id, event.data.message);
             }
@@ -93,10 +102,28 @@ export function useSSE({ sessionId, enabled, onComplete, onError }: UseSSEOption
           case 'tool.start':
             if (event.data) {
               startToolCall(
+                sessionId,
                 event.data.toolCallId,
                 event.data.toolName,
                 event.data.params || event.data.parameters
               );
+
+              const toolStepId = `tool-${event.data.toolCallId}`;
+              const existingSteps = useChatStore.getState().reasoningSteps.get(sessionId) || [];
+              const alreadyTracked = existingSteps.some((step) => step.stepId === toolStepId);
+              if (!alreadyTracked) {
+                const isSearch = ['web_search', 'paper_search'].includes(event.data.toolName);
+                addReasoningStep(sessionId, {
+                  stepId: toolStepId,
+                  label: isSearch ? 'Searching' : 'Executing tool',
+                  status: 'running',
+                  startedAt: Date.now(),
+                  message: isSearch ? 'Running search...' : `Running ${event.data.toolName}...`,
+                  details: {
+                    toolName: event.data.toolName,
+                  },
+                });
+              }
             }
             break;
 
@@ -120,6 +147,7 @@ export function useSSE({ sessionId, enabled, onComplete, onError }: UseSSEOption
                 artifacts: event.data.artifacts,
               };
               completeToolCall(event.data.toolCallId, toolResult);
+              completeReasoningStep(sessionId, `tool-${event.data.toolCallId}`, Date.now());
             }
             break;
 
@@ -132,6 +160,62 @@ export function useSSE({ sessionId, enabled, onComplete, onError }: UseSSEOption
                 duration: event.data.duration || 0,
               };
               completeToolCall(event.data.toolCallId, toolResult);
+              completeReasoningStep(sessionId, `tool-${event.data.toolCallId}`, Date.now());
+            }
+            break;
+
+          case 'reasoning.step':
+            if (event.data) {
+              const existingSteps = useChatStore.getState().reasoningSteps.get(sessionId) || [];
+              const alreadyTracked = existingSteps.some((step) => step.stepId === event.data.stepId);
+              const thinkingContent = event.data.thinkingContent;
+              if (event.data.status === 'running') {
+                if (!alreadyTracked) {
+                  addReasoningStep(sessionId, {
+                    stepId: event.data.stepId,
+                    label: event.data.label,
+                    status: 'running',
+                    startedAt: Date.now(),
+                    message: event.data.message,
+                    thinkingContent,
+                    details: event.data.details,
+                  });
+                } else {
+                  updateReasoningStep(sessionId, event.data.stepId, {
+                    label: event.data.label,
+                    status: 'running',
+                    message: event.data.message,
+                    ...(thinkingContent ? { thinkingContent } : {}),
+                    details: event.data.details,
+                  });
+                }
+              }
+
+              if (event.data.status === 'completed') {
+                if (!alreadyTracked) {
+                  addReasoningStep(sessionId, {
+                    stepId: event.data.stepId,
+                    label: event.data.label,
+                    status: 'completed',
+                    startedAt: Date.now(),
+                    completedAt: Date.now(),
+                    durationMs: event.data.durationMs,
+                    message: event.data.message,
+                    thinkingContent,
+                    details: event.data.details,
+                  });
+                } else {
+                  updateReasoningStep(sessionId, event.data.stepId, {
+                    label: event.data.label,
+                    status: 'completed',
+                    completedAt: Date.now(),
+                    durationMs: event.data.durationMs,
+                    message: event.data.message,
+                    ...(thinkingContent ? { thinkingContent } : {}),
+                    details: event.data.details,
+                  });
+                }
+              }
             }
             break;
 
@@ -192,6 +276,10 @@ export function useSSE({ sessionId, enabled, onComplete, onError }: UseSSEOption
     startToolCall,
     updateToolCallProgress,
     completeToolCall,
+    addReasoningStep,
+    updateReasoningStep,
+    completeReasoningStep,
+    clearReasoningSteps,
     addFileArtifact,
     stopStreaming,
     finalizeStreamingMessage,

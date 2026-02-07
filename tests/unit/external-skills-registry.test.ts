@@ -77,7 +77,9 @@ describe('DynamicSkillRegistry', () => {
 
   it('lists enabled external skills with metadata', async () => {
     const skills = await registry.listAll(true);
-    const found = skills.find((s) => s.isExternal && s.name === testSkillId);
+    const found = skills.find(
+      (s) => s.isExternal && s.externalMetadata?.canonicalId === testSkillId
+    );
 
     expect(found).toBeDefined();
     expect(found?.externalMetadata?.canonicalId).toBe(testSkillId);

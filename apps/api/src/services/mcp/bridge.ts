@@ -136,6 +136,7 @@ const BUILTIN_TOOLS = new Set([
   'file_writer',
   'bash_executor',
   'python_executor',
+  'paper_search',
   'web_search',
   'web_scraper',
   'code_analyzer',

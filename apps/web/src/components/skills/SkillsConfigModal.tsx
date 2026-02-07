@@ -15,6 +15,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { Switch } from '../ui/switch';
 import { Badge } from '../ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { useToast } from '../../hooks/use-toast';
 import { useUserSkills, useUpdateUserSkills } from '../../hooks/useUserSkills';
 import { apiClient, type UserSkill, type ExternalSkill } from '../../lib/api';
@@ -223,7 +224,16 @@ export function SkillsConfigModal({ open, onOpenChange }: SkillsConfigModalProps
     getScrollElement: () => parentRef.current,
     estimateSize: () => 120, // approx row height
     overscan: 5,
+    measureElement: (el) => el.getBoundingClientRect().height,
   });
+
+  useEffect(() => {
+    if (!open) return;
+    const raf = requestAnimationFrame(() => {
+      virtualizer.measure();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [open, filteredSkills.length, virtualizer]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -306,34 +316,35 @@ export function SkillsConfigModal({ open, onOpenChange }: SkillsConfigModalProps
 
         {/* Skills list */}
         <div className="flex-1 min-h-0 overflow-hidden px-6">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : filteredSkills.length === 0 ? (
-            <div className="text-center py-12">
-              {scope === 'added' && !searchQuery ? (
-                <div className="space-y-4">
-                  <p className="text-muted-foreground">No skills added yet</p>
-                  <Button variant="outline" onClick={() => setScope('all')}>
-                    Browse all skills
-                  </Button>
-                </div>
-              ) : searchQuery ? (
-                <div className="space-y-4">
-                  <p className="text-muted-foreground">
-                    No skills match &quot;{searchQuery}&quot;
-                  </p>
-                  <Button variant="ghost" onClick={() => setSearchQuery('')}>
-                    Clear search
-                  </Button>
-                </div>
-              ) : (
-                <p className="text-muted-foreground">No skills found</p>
-              )}
-            </div>
-          ) : (
-            <div ref={parentRef} className="h-full overflow-auto">
+          <TooltipProvider delayDuration={300}>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : filteredSkills.length === 0 ? (
+              <div className="text-center py-12">
+                {scope === 'added' && !searchQuery ? (
+                  <div className="space-y-4">
+                    <p className="text-muted-foreground">No skills added yet</p>
+                    <Button variant="outline" onClick={() => setScope('all')}>
+                      Browse all skills
+                    </Button>
+                  </div>
+                ) : searchQuery ? (
+                  <div className="space-y-4">
+                    <p className="text-muted-foreground">
+                      No skills match &quot;{searchQuery}&quot;
+                    </p>
+                    <Button variant="ghost" onClick={() => setSearchQuery('')}>
+                      Clear search
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">No skills found</p>
+                )}
+              </div>
+            ) : (
+              <div ref={parentRef} className="h-full overflow-auto">
               <div
                 style={{
                   height: `${virtualizer.getTotalSize()}px`,
@@ -346,6 +357,8 @@ export function SkillsConfigModal({ open, onOpenChange }: SkillsConfigModalProps
                   return (
                     <div
                       key={skill.canonicalId}
+                      data-index={virtualItem.index}
+                      ref={virtualizer.measureElement}
                       style={{
                         position: 'absolute',
                         top: 0,
@@ -370,9 +383,16 @@ export function SkillsConfigModal({ open, onOpenChange }: SkillsConfigModalProps
                                 </Badge>
                               )}
                             </div>
-                            <p className="text-sm text-muted-foreground">
-                              {skill.description}
-                            </p>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <p className="text-sm text-muted-foreground line-clamp-2 cursor-default">
+                                  {skill.description}
+                                </p>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" align="start" className="max-w-md">
+                                <p className="text-sm">{skill.description}</p>
+                              </TooltipContent>
+                            </Tooltip>
                             {skill.updatedAt && (
                               <p className="text-xs text-muted-foreground">
                                 Last updated:{' '}
@@ -425,7 +445,8 @@ export function SkillsConfigModal({ open, onOpenChange }: SkillsConfigModalProps
                 })}
               </div>
             </div>
-          )}
+            )}
+          </TooltipProvider>
         </div>
 
         {/* Footer */}

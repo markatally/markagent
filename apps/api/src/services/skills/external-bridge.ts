@@ -15,7 +15,7 @@ export class ExternalSkillAdapter {
    */
   toProductSkill(external: UnifiedSkill): Skill {
     return {
-      name: external.canonicalId,
+      name: external.name,
       description: external.description,
       aliases: this.extractAliases(external),
       category: this.mapCategory(external.category),

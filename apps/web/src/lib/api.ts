@@ -321,7 +321,8 @@ export const chatApi = {
    */
   async *sendAndStream(
     sessionId: string,
-    content: string
+    content: string,
+    signal?: AbortSignal
   ): AsyncGenerator<SSEEvent, void, unknown> {
     const token = getAccessToken();
     const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/chat`, {
@@ -331,6 +332,7 @@ export const chatApi = {
         ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({ content }),
+      signal,
     });
 
     if (!response.ok) {
@@ -461,6 +463,19 @@ export const filesApi = {
     }
 
     return response.blob();
+  },
+
+  /**
+   * Get a signed download URL for a file
+   */
+  async getDownloadUrl(sessionId: string, fileId: string): Promise<string> {
+    const response = await apiFetch<{ token: string; url: string }>(
+      `/sessions/${sessionId}/files/${fileId}/download-token`,
+      {
+        method: 'POST',
+      }
+    );
+    return response.url;
   },
 
   /**

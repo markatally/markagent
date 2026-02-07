@@ -61,7 +61,7 @@
   "session": {
     "maxIdleTime": 3600,
     "maxDuration": 86400,
-    "maxHistoryMessages": 100,
+    "maxHistoryMessages": 20,
     "contextWindowTokens": 128000
   },
   "tools": {
@@ -71,6 +71,7 @@
       "file_reader",
       "file_writer",
       "ppt_generator",
+      "paper_search",
       "web_search",
       "web_scraper",
       "code_analyzer",

@@ -6,4 +6,5 @@ export * from './file_reader';
 export * from './file_writer';
 export * from './bash_executor';
 export * from './ppt_generator';
+export * from './paper_search';
 export * from './web_search';

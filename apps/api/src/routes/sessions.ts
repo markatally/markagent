@@ -101,6 +101,9 @@ sessions.get('/:id', async (c) => {
         orderBy: {
           createdAt: 'asc',
         },
+        include: {
+          toolCalls: true,
+        },
       },
     },
   });
@@ -117,7 +120,12 @@ sessions.get('/:id', async (c) => {
     );
   }
 
-  return c.json(session);
+  const toolCalls = await prisma.toolCall.findMany({
+    where: { sessionId },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  return c.json({ ...session, toolCalls });
 });
 
 /**

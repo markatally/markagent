@@ -104,8 +104,57 @@ export class PptGeneratorTool implements Tool {
     const startTime = Date.now();
 
     try {
-      const presentation = params.presentation as Presentation;
-      const filename = (params.filename as string) || 'presentation.pptx';
+      const normalizedParams: Record<string, any> = { ...(params || {}) };
+
+      // Normalize common LLM mistakes
+      if (typeof normalizedParams.presentation === 'string') {
+        try {
+          normalizedParams.presentation = JSON.parse(normalizedParams.presentation);
+        } catch {
+          // Keep as-is; validation below will handle invalid structure
+        }
+      }
+
+      if (!normalizedParams.presentation && (normalizedParams.title || normalizedParams.slides)) {
+        normalizedParams.presentation = {
+          title: normalizedParams.title,
+          subtitle: normalizedParams.subtitle,
+          author: normalizedParams.author,
+          slides: normalizedParams.slides,
+        };
+      }
+
+      let presentation = normalizedParams.presentation as Presentation;
+
+      if (presentation && typeof (presentation as any).slides === 'string') {
+        try {
+          const parsedSlides = JSON.parse((presentation as any).slides);
+          if (Array.isArray(parsedSlides)) {
+            presentation = { ...presentation, slides: parsedSlides };
+          }
+        } catch {
+          // Keep as-is; validation below will handle invalid structure
+        }
+      }
+
+      if (presentation && Array.isArray(presentation.slides)) {
+        presentation = {
+          ...presentation,
+          slides: presentation.slides.map((slide) => {
+            if (!slide || typeof slide !== 'object') return slide;
+            const normalizedSlide = { ...slide };
+            if (typeof normalizedSlide.content === 'string') {
+              normalizedSlide.content = [normalizedSlide.content];
+            }
+            if (typeof normalizedSlide.bullets === 'string') {
+              normalizedSlide.bullets = [normalizedSlide.bullets];
+            }
+            return normalizedSlide;
+          }),
+        };
+      }
+
+      const filename = (normalizedParams.filename as string) || 'presentation.pptx';
 
       // Validate presentation structure
       if (!presentation || typeof presentation !== 'object') {

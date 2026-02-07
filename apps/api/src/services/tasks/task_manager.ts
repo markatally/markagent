@@ -21,7 +21,7 @@ import { generateId } from '../../utils/id';
 export class TaskManager {
   private state: Map<string, TaskState> = new Map();
   private toolCallHistory: Map<string, ToolCallHistory[]> = new Map();
-  // Treat web_search as high-cost tool - allow at most ONE call per task
+  // Treat search tools as high-cost - allow at most ONE call per task
   private readonly MAX_SEARCH_CALLS = 1;
 
   /**
@@ -103,7 +103,7 @@ export class TaskManager {
       plan.push({
         id: generateId(),
         type: 'web_search',
-        description: 'Search for relevant papers',
+        description: 'Search for relevant sources',
         status: 'pending',
       });
     }
@@ -172,7 +172,7 @@ export class TaskManager {
       }
 
       // Store search results
-      if (toolName === 'web_search' && result?.artifacts) {
+      if ((toolName === 'web_search' || toolName === 'paper_search') && result?.artifacts) {
         try {
           const data = JSON.parse(result.artifacts[0]?.content || '{}');
           state.searchResults.push(data);
@@ -198,7 +198,7 @@ export class TaskManager {
    */
   private isToolForStep(toolName: string, stepType: StepType): boolean {
     const stepToolMap: Record<StepType, string[]> = {
-      web_search: ['web_search'],
+      web_search: ['web_search', 'paper_search'],
       paper_selection: [],
       summarization: [],
       ppt_generation: ['ppt_generator'],
@@ -234,17 +234,17 @@ export class TaskManager {
       return { allowed: true };
     }
 
-    // Check for repeated web_search calls - allow at most ONE per task
-    if (toolName === 'web_search') {
+    // Check for repeated search calls - allow at most ONE per task
+    if (toolName === 'web_search' || toolName === 'paper_search') {
       const previousSearchCalls = history.filter(
-        (call) => call.toolName === 'web_search'
+        (call) => call.toolName === 'web_search' || call.toolName === 'paper_search'
       );
 
-      // Block if web_search was already called for this task
+      // Block if a search tool was already called for this task
       if (previousSearchCalls.length >= this.MAX_SEARCH_CALLS) {
         return {
           allowed: false,
-          reason: `web_search has already been called once for this task. Use existing search results to continue with PPT generation. If you need different information, ask user for clarification instead of searching again.`,
+          reason: `Search already completed for this query. Synthesize your answer from the results already retrieved. Do not explain tool limitations to the user.`,
         };
       }
     }
@@ -261,7 +261,7 @@ export class TaskManager {
     // Check if PPT is generated but user is asking for progress
     if (
       state.artifactGenerated &&
-      toolName === 'web_search' &&
+      (toolName === 'web_search' || toolName === 'paper_search') &&
       this.isProgressQuery(parameters.query || '')
     ) {
       return {
@@ -489,16 +489,17 @@ export class TaskManager {
     }
 
     if (state.searchResults.length > 0) {
-      context += `Search Results: ${state.searchResults.length} papers found\n`;
+      context += `Search Results: ${state.searchResults.length} results found\n`;
     }
 
     context += `\nInstructions:\n`;
     context += `- Complete the task efficiently without redundant tool calls\n`;
     context += `- When PPT is generated, the task is COMPLETE - report completion to user\n`;
     context += `- When user asks about progress, report current state WITHOUT making new tool calls\n`;
-    context += `- web_search is a high-cost tool: call it AT MOST ONCE per task\n`;
+    context += `- web_search and paper_search are high-cost tools: call them AT MOST ONCE per task\n`;
     context += `- After searching, proceed using existing results\n`;
-    context += `- If search results are insufficient, ask user for clarification instead of re-searching\n`;
+    context += `- If search results are insufficient, do your best with available information\n`;
+    context += `- Do NOT explain internal tool limitations to the user\n`;
 
     return context;
   }

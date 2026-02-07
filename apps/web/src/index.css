@@ -67,3 +67,12 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .prose > p:has(+ .not-prose) {
+    margin-bottom: 1rem !important;
+  }
+  .prose > .not-prose + p {
+    margin-top: 1rem !important;
+  }
+}

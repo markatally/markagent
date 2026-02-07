@@ -358,7 +358,7 @@ Extract relevant entities like topic, keywords, file paths, etc.`;
 
 /**
  * Paper Discovery Node
- * MANDATORY tool usage - uses web_search to find papers
+ * MANDATORY tool usage - uses paper_search to find papers
  * 
  * RECALL-PERMISSIVE DESIGN:
  * - Zero results NEVER cause fatal errors

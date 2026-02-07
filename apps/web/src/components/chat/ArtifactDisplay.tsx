@@ -2,7 +2,7 @@ import { FileText, FileImage, FileCode, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import type { Artifact } from '@mark/shared';
-import { filesApi } from '../../lib/api';
+import { triggerDownload } from '../../lib/download';
 
 interface ArtifactDisplayProps {
   artifact: Artifact;
@@ -37,7 +37,6 @@ function formatFileSize(bytes?: number): string {
 
 /**
  * Handle file download with proper error handling
- * Uses fetch + blob to ensure the file is properly downloaded
  */
 async function handleDownload(
   e: React.MouseEvent<HTMLButtonElement>,
@@ -53,22 +52,7 @@ async function handleDownload(
   }
 
   try {
-    // Use authenticated API call to include auth headers
-    const blob = await filesApi.download(sessionId, fileId);
-
-    // Create download URL from blob
-    const downloadUrl = URL.createObjectURL(blob);
-
-    // Create temporary link and trigger download
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    // Clean up
-    URL.revokeObjectURL(downloadUrl);
+    await triggerDownload(sessionId, fileId, filename);
   } catch (error) {
     console.error('Download failed:', error);
     alert(`Failed to download file: ${error instanceof Error ? error.message : 'Unknown error'}`);

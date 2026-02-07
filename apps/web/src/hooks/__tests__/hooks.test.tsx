@@ -44,16 +44,20 @@ vi.mock('../../stores/authStore', () => ({
 vi.mock('../../stores/chatStore', () => {
   const chatState = {
     messages: [],
+    toolCalls: new Map(),
     setMessages: vi.fn(),
     addMessage: vi.fn(),
     updateMessage: vi.fn(),
+    startToolCall: vi.fn(),
+    updateToolCall: vi.fn(),
   };
 
-  return {
-    useChatStore: vi.fn((selector?: (state: typeof chatState) => any) =>
-      selector ? selector(chatState) : chatState
-    ),
-  };
+  const useChatStore = vi.fn((selector?: (state: typeof chatState) => any) =>
+    selector ? selector(chatState) : chatState
+  );
+  useChatStore.getState = () => chatState;
+
+  return { useChatStore };
 });
 
 describe('Hooks', () => {

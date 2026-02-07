@@ -206,11 +206,12 @@ describe('chatStore', () => {
   describe('tool calls', () => {
     it('should start a tool call', () => {
       const { startToolCall } = useChatStore.getState();
-      startToolCall('tool-1', 'read_file', { path: '/test.txt' });
+      startToolCall('session-1', 'tool-1', 'read_file', { path: '/test.txt' });
 
       const state = useChatStore.getState();
       const toolCall = state.toolCalls.get('tool-1');
       expect(toolCall).toEqual({
+        sessionId: 'session-1',
         toolCallId: 'tool-1',
         toolName: 'read_file',
         params: { path: '/test.txt' },
@@ -220,7 +221,7 @@ describe('chatStore', () => {
 
     it('should update tool call', () => {
       const { startToolCall, updateToolCall } = useChatStore.getState();
-      startToolCall('tool-1', 'read_file', { path: '/test.txt' });
+      startToolCall('session-1', 'tool-1', 'read_file', { path: '/test.txt' });
       updateToolCall('tool-1', { status: 'completed', result: { success: true, output: 'File contents', duration: 0 } });
 
       const state = useChatStore.getState();
@@ -231,7 +232,7 @@ describe('chatStore', () => {
 
     it('should complete a tool call successfully', () => {
       const { startToolCall, completeToolCall } = useChatStore.getState();
-      startToolCall('tool-1', 'read_file', { path: '/test.txt' });
+      startToolCall('session-1', 'tool-1', 'read_file', { path: '/test.txt' });
       completeToolCall('tool-1', { success: true, output: 'File contents here', duration: 100 });
 
       const state = useChatStore.getState();
@@ -243,7 +244,7 @@ describe('chatStore', () => {
 
     it('should handle tool call error', () => {
       const { startToolCall, completeToolCall } = useChatStore.getState();
-      startToolCall('tool-1', 'read_file', { path: '/missing.txt' });
+      startToolCall('session-1', 'tool-1', 'read_file', { path: '/missing.txt' });
       completeToolCall('tool-1', { success: false, output: '', error: 'File not found', duration: 50 });
 
       const state = useChatStore.getState();
@@ -255,8 +256,8 @@ describe('chatStore', () => {
 
     it('should clear all tool calls', () => {
       const { startToolCall, clearToolCalls } = useChatStore.getState();
-      startToolCall('tool-1', 'read_file', { path: '/test1.txt' });
-      startToolCall('tool-2', 'write_file', { path: '/test2.txt' });
+      startToolCall('session-1', 'tool-1', 'read_file', { path: '/test1.txt' });
+      startToolCall('session-1', 'tool-2', 'write_file', { path: '/test2.txt' });
 
       expect(useChatStore.getState().toolCalls.size).toBe(2);
 

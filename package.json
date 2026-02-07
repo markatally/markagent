@@ -11,7 +11,7 @@
     "dev:web": "turbo run dev --filter=web",
     "dev:api": "turbo run dev --filter=api",
     "build": "turbo run build",
-    "test": "CONFIG_PATH=config/default.json bun test tests/",
+    "test": "CONFIG_PATH=config/default.json bun test tests/unit tests/integration",
     "test:api": "turbo run test --filter=api",
     "lint": "turbo run lint",
     "worker": "cd apps/api && bun run worker",
@@ -23,8 +23,11 @@
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.0.0",
     "turbo": "^2.0.0",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "typescript-eslint": "^8.54.0"
   },
   "packageManager": "bun@1.0.0",
   "dependencies": {

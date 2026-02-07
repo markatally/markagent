@@ -295,7 +295,7 @@ export const PaperDiscoverySkill: AtomicSkill<PaperDiscoveryInput, PaperDiscover
     version: '1.1.0', // Version bump for recall-permissive behavior
     description: 'Discovers academic papers from multiple sources. Zero results are informational, not errors.',
     category: 'research',
-    requiredTools: ['web_search'],
+    requiredTools: ['paper_search'],
     estimatedDurationMs: 10000,
     retryPolicy: { maxRetries: 3, backoffMs: 1000, backoffMultiplier: 2 },
   },
@@ -305,19 +305,19 @@ export const PaperDiscoverySkill: AtomicSkill<PaperDiscoveryInput, PaperDiscover
   
   async execute(input, context) {
     const startTime = Date.now();
-    const searchTool = context.tools.getTool('web_search');
+    const searchTool = context.tools.getTool('paper_search');
 
     if (!searchTool) {
       // RECALL-PERMISSIVE: Return empty results instead of throwing
-      console.warn('[PaperDiscoverySkill] web_search tool not available, returning empty results');
+      console.warn('[PaperDiscoverySkill] paper_search tool not available, returning empty results');
       return {
         papers: [],
         metadata: {
           totalFound: 0,
           sourcesSearched: [],
           duration: Date.now() - startTime,
-          sourcesSkipped: ['web_search_unavailable'],
-          exclusionReasons: ['web_search tool is required but not available'],
+          sourcesSkipped: ['paper_search_unavailable'],
+          exclusionReasons: ['paper_search tool is required but not available'],
         },
       };
     }

@@ -2,8 +2,7 @@ import { useMemo } from 'react';
 import { Bot, User } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { CodeBlock } from '../ui/code-block';
 import type { Message } from '@mark/shared';
 import { cn } from '../../lib/utils';
 import { formatDistanceToNow } from 'date-fns';
@@ -30,27 +29,43 @@ const TABLE_BLOCK_PATTERN = /<!--TABLE:([a-zA-Z0-9_-]+)-->/g;
 const markdownComponents: Components = {
   // Code blocks with syntax highlighting
   code(props) {
-    const { children, className, ...rest } = props;
+    const { children, className, node, ...rest } = props;
     const match = /language-(\w+)/.exec(className || '');
-    return match ? (
-      <SyntaxHighlighter
-        style={oneDark as any}
-        language={match[1]}
-        PreTag="div"
-      >
-        {String(children).replace(/\n$/, '')}
-      </SyntaxHighlighter>
-    ) : (
+    const codeString = String(children).replace(/\n$/, '');
+    const isBlock = /\n/.test(codeString) || (node as { position?: unknown })?.position;
+
+    if (match) {
+      return (
+        <CodeBlock
+          language={match[1]}
+          code={codeString}
+        />
+      );
+    }
+
+    if (isBlock && !className) {
+      return (
+        <CodeBlock
+          language="text"
+          code={codeString}
+        />
+      );
+    }
+
+    return (
       <code className={className} {...rest}>
         {children}
       </code>
     );
   },
+  pre({ children }) {
+    return <pre className="not-prose">{children}</pre>;
+  },
 
   // Table components with responsive styling
   table({ children, ...props }) {
     return (
-      <div className="my-4 w-full overflow-x-auto rounded-lg border border-border">
+      <div className="not-prose my-4 w-full overflow-x-auto rounded-lg border border-border">
         <table
           className="w-full border-collapse text-sm"
           {...props}
@@ -163,7 +178,7 @@ function TableBlockRenderer({ tableId }: { tableId: string }) {
 
   // Table not found - render placeholder
   return (
-    <div className="my-4 p-4 rounded-lg border border-border bg-muted/20 text-sm text-muted-foreground">
+    <div className="not-prose my-4 p-4 rounded-lg border border-border bg-muted/20 text-sm text-muted-foreground">
       Loading table...
     </div>
   );

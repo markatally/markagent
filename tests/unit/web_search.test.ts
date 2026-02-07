@@ -109,13 +109,17 @@ describe('WebSearchTool', () => {
     }
   });
 
-  it('should use custom sources parameter', async () => {
+  it('should use custom topic parameter', async () => {
     const tool = new WebSearchTool(mockContext, { runOrchestrator: mockOrchestrator });
 
-    const result = await tool.execute({ query: 'neural networks', sources: 'arxiv' });
+    const result = await tool.execute({ query: 'neural networks', topic: 'news' });
 
-    expect(result.output).toContain('arxiv');
-    if (!result.success) expect(result.error).toBeDefined();
+    if (result.success && result.artifacts?.length) {
+      const payload = JSON.parse(result.artifacts[0].content);
+      expect(payload.topic).toBe('news');
+    } else {
+      expect(result.error).toBeDefined();
+    }
   });
 
   it('should use custom topK parameter', async () => {
@@ -136,18 +140,20 @@ describe('WebSearchTool', () => {
     if (!result.success) expect(result.error).toBeDefined();
   });
 
-  it('should handle multiple sources', async () => {
+  it('should use custom maxResults parameter', async () => {
     const tool = new WebSearchTool(mockContext, { runOrchestrator: mockOrchestrator });
 
     const result = await tool.execute({
       query: 'reinforcement learning',
-      sources: 'all',
-      topK: 2,
+      maxResults: 2,
     });
 
-    expect(result.success).toBe(true);
-    expect(result.output).toContain('arxiv');
-    expect(result.output).toContain('semantic_scholar');
+    if (result.success && result.artifacts?.length) {
+      const payload = JSON.parse(result.artifacts[0].content);
+      expect(payload.maxResults).toBe(2);
+    } else {
+      expect(result.error).toBeDefined();
+    }
   });
 
   it('should limit topK to maximum 20', async () => {

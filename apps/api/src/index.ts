@@ -13,6 +13,7 @@ import { fileRoutes } from './routes/files';
 import { skillRoutes } from './routes/skills';
 import { externalSkillRoutes } from './routes/external-skills';
 import { userSkillRoutes } from './routes/user-skills';
+import { publicDownloadRoutes } from './routes/public-download';
 
 const app = new Hono();
 
@@ -45,6 +46,7 @@ app.route('/api', fileRoutes); // File upload/download endpoints
 app.route('/api/skills', skillRoutes); // Skill listing and invocation
 app.route('/api/external-skills', externalSkillRoutes);
 app.route('/api/user-skills', userSkillRoutes); // User skill preferences
+app.route('/api/public', publicDownloadRoutes); // Public download with token
 
 // 404 handler
 app.notFound((c) => {

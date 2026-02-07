@@ -43,6 +43,7 @@ type StreamEventType =
   | 'message.start'
   | 'message.delta'
   | 'message.complete'
+  | 'reasoning.step'
   | 'thinking.start'
   | 'thinking.delta'
   | 'thinking.complete'
@@ -82,10 +83,97 @@ async function processAgentTurn(
   sseStream: any,
   startTime: number,
   maxSteps: number = AGENT_CONFIG.maxToolSteps
-): Promise<{ content: string; finishReason: string; stepsTaken: number }> {
+): Promise<{
+  content: string;
+  finishReason: string;
+  stepsTaken: number;
+  reasoningSteps: typeof completedReasoningSteps;
+}> {
   let currentMessages = [...messages];
   let steps = 0;
   let finalContent = '';
+
+  const reasoningTimers = new Map<string, number>();
+  const searchToolNames = new Set(['web_search', 'paper_search']);
+  let reasoningStepCounter = 0;
+  let pendingThinkingStepId: string | null = null;
+  let generatingStepId: string | null = null;
+  let planningStepId: string | null = null;
+
+  // Collector array for completed reasoning steps to persist in message metadata
+  const completedReasoningSteps: Array<{
+    stepId: string;
+    label: string;
+    startedAt: number;
+    completedAt: number;
+    durationMs: number;
+    message?: string;
+    details?: { queries?: string[]; sources?: string[]; toolName?: string };
+    thinkingContent?: string;
+  }> = [];
+
+  const emitReasoningStep = async ({
+    stepId,
+    label,
+    status,
+    message,
+    details,
+    thinkingContent,
+  }: {
+    stepId: string;
+    label: string;
+    status: 'running' | 'completed';
+    message?: string;
+    details?: { queries?: string[]; sources?: string[]; toolName?: string };
+    thinkingContent?: string;
+  }) => {
+    const now = Date.now();
+    if (status === 'running') {
+      reasoningTimers.set(stepId, now);
+    }
+    const startedAt = reasoningTimers.get(stepId);
+    const durationMs = status === 'completed' && startedAt ? now - startedAt : undefined;
+
+    // Collect completed steps for persistence
+    if (status === 'completed' && startedAt && durationMs !== undefined) {
+      completedReasoningSteps.push({
+        stepId,
+        label,
+        startedAt,
+        completedAt: now,
+        durationMs,
+        message,
+        details,
+        thinkingContent,
+      });
+    }
+
+    await sseStream.writeSSE({
+      data: JSON.stringify({
+        type: 'reasoning.step',
+        sessionId,
+        timestamp: now,
+        data: {
+          stepId,
+          label,
+          status,
+          message,
+          durationMs,
+          details,
+          thinkingContent,
+        },
+      }),
+    });
+  };
+
+  // Emit initial step (will be relabeled based on whether tools are used)
+  planningStepId = `planning-${Date.now()}-${reasoningStepCounter++}`;
+  await emitReasoningStep({
+    stepId: planningStepId,
+    label: 'Analyzing',
+    status: 'running',
+    message: 'Processing query...',
+  });
 
   // === CONTINUATION LOOP ===
   while (steps < maxSteps) {
@@ -98,11 +186,44 @@ async function processAgentTurn(
     let hasToolCalls = false;
     const toolCallsCollected: Array<{ id: string; name: string; arguments: string }> = [];
     let stepContent = '';
+    let thinkingContentEmitted = false;
 
     // === Step 1: Stream from LLM ===
     for await (const chunk of llmClient.streamChat(currentMessages, tools)) {
       if (chunk.type === 'content' && chunk.content) {
         stepContent += chunk.content;
+
+        // Update planning step to "Generating response" when first token arrives
+        if (planningStepId) {
+          await emitReasoningStep({
+            stepId: planningStepId,
+            label: 'Generating response',
+            status: 'running',
+            message: 'Streaming response...',
+          });
+          generatingStepId = planningStepId;
+          planningStepId = null;
+        }
+        if (pendingThinkingStepId) {
+          await emitReasoningStep({
+            stepId: pendingThinkingStepId,
+            label: 'Thinking',
+            status: 'completed',
+            message: 'Thought through results.',
+          });
+          pendingThinkingStepId = null;
+          
+          // Start generating step after thinking
+          if (!generatingStepId) {
+            generatingStepId = `generating-${steps + 1}-${reasoningStepCounter++}`;
+            await emitReasoningStep({
+              stepId: generatingStepId,
+              label: 'Generating response',
+              status: 'running',
+              message: 'Drafting response...',
+            });
+          }
+        }
 
         await sseStream.writeSSE({
           data: JSON.stringify({
@@ -117,6 +238,46 @@ async function processAgentTurn(
         hasToolCalls = true;
         toolCallsCollected.push(chunk.toolCall);
 
+        if (!thinkingContentEmitted && stepContent.trim().length > 0) {
+          thinkingContentEmitted = true;
+          await emitReasoningStep({
+            stepId: `reasoning-${steps + 1}-${reasoningStepCounter++}`,
+            label: 'Reasoning',
+            status: 'completed',
+            message: 'Drafted approach before tools.',
+            thinkingContent: stepContent.trim(),
+          });
+        }
+
+        // Complete analyzing/planning or thinking when tool calls begin
+        if (planningStepId) {
+          await emitReasoningStep({
+            stepId: planningStepId,
+            label: 'Analyzing',
+            status: 'completed',
+            message: 'Analysis complete, calling tools.',
+          });
+          planningStepId = null;
+        }
+        if (pendingThinkingStepId) {
+          await emitReasoningStep({
+            stepId: pendingThinkingStepId,
+            label: 'Thinking',
+            status: 'completed',
+            message: 'Thought through results.',
+          });
+          pendingThinkingStepId = null;
+        }
+        if (generatingStepId) {
+          await emitReasoningStep({
+            stepId: generatingStepId,
+            label: 'Generating response',
+            status: 'completed',
+            message: 'Switching to tools...',
+          });
+          generatingStepId = null;
+        }
+
         // Parse params for the tool.start event so frontend can display them
         let params = {};
         try {
@@ -124,6 +285,27 @@ async function processAgentTurn(
         } catch {
           // Keep empty params if JSON parsing fails
         }
+
+        const toolReasoningStepId = `tool-${chunk.toolCall.id}`;
+        const isSearch = searchToolNames.has(chunk.toolCall.name);
+        const queries = Array.isArray((params as any).queries)
+          ? (params as any).queries
+          : (params as any).query
+          ? [(params as any).query]
+          : undefined;
+
+        await emitReasoningStep({
+          stepId: toolReasoningStepId,
+          label: isSearch ? 'Searching' : 'Executing tool',
+          status: 'running',
+          message: isSearch
+            ? `Executing ${queries?.length || 1} search quer${queries?.length === 1 ? 'y' : 'ies'}...`
+            : `Running ${chunk.toolCall.name}...`,
+          details: {
+            queries,
+            toolName: chunk.toolCall.name,
+          },
+        });
 
         await sseStream.writeSSE({
           data: JSON.stringify({
@@ -150,6 +332,16 @@ async function processAgentTurn(
       // Process any structured table JSON blocks into rendered markdown
       finalContent = processAgentOutput(stepContent);
 
+      if (generatingStepId) {
+        await emitReasoningStep({
+          stepId: generatingStepId,
+          label: 'Generating response',
+          status: 'completed',
+          message: 'Response ready.',
+        });
+        generatingStepId = null;
+      }
+
       await sseStream.writeSSE({
         data: JSON.stringify({
           type: 'message.complete',
@@ -163,7 +355,12 @@ async function processAgentTurn(
         }),
       });
 
-      return { content: finalContent, finishReason: 'stop', stepsTaken: steps };
+      return {
+        content: finalContent,
+        finishReason: 'stop',
+        stepsTaken: steps,
+        reasoningSteps: completedReasoningSteps,
+      };
     }
 
     // === Step 3: Has tool calls - execute them and continue ===
@@ -209,6 +406,16 @@ async function processAgentTurn(
           role: 'tool',
           content: JSON.stringify({ success: false, error: toolCheck.reason }),
           tool_call_id: toolCall.id,
+        });
+
+        await emitReasoningStep({
+          stepId: `tool-${toolCall.id}`,
+          label: searchToolNames.has(toolCall.name) ? 'Searching' : 'Executing tool',
+          status: 'completed',
+          message: toolCheck.reason || 'Tool call not allowed.',
+          details: {
+            toolName: toolCall.name,
+          },
         });
 
         continue;
@@ -299,9 +506,20 @@ async function processAgentTurn(
               success: result.success,
               error: result.error,
               duration: result.duration,
+              artifacts: result.artifacts,
               step: steps + 1,
             },
           }),
+        });
+
+        await emitReasoningStep({
+          stepId: `tool-${toolCall.id}`,
+          label: searchToolNames.has(toolCall.name) ? 'Searching' : 'Executing tool',
+          status: 'completed',
+          message: result.success ? undefined : 'Failed.',
+          details: {
+            toolName: toolCall.name,
+          },
         });
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Tool execution failed';
@@ -326,6 +544,16 @@ async function processAgentTurn(
             },
           }),
         });
+
+        await emitReasoningStep({
+          stepId: `tool-${toolCall.id}`,
+          label: searchToolNames.has(toolCall.name) ? 'Searching' : 'Executing tool',
+          status: 'completed',
+          message: errorMsg,
+          details: {
+            toolName: toolCall.name,
+          },
+        });
       }
     }
 
@@ -334,6 +562,22 @@ async function processAgentTurn(
 
     // Emit thinking.start before next LLM call so frontend shows progress
     // This prevents the UI from appearing "stuck" between tool execution steps
+    const toolCount = toolCallsCollected.length;
+    const searchCount = toolCallsCollected.filter((toolCall) =>
+      searchToolNames.has(toolCall.name)
+    ).length;
+    const thinkingMessage = searchCount > 0
+      ? `Reviewing ${searchCount} search result${searchCount === 1 ? '' : 's'}...`
+      : `Reviewing ${toolCount || 1} tool result${toolCount === 1 ? '' : 's'}...`;
+
+    pendingThinkingStepId = `thinking-${steps + 1}-${reasoningStepCounter++}`;
+    await emitReasoningStep({
+      stepId: pendingThinkingStepId,
+      label: 'Thinking',
+      status: 'running',
+      message: thinkingMessage,
+    });
+
     await sseStream.writeSSE({
       data: JSON.stringify({
         type: 'thinking.start',
@@ -360,7 +604,12 @@ async function processAgentTurn(
     }),
   });
 
-  return { content: finalContent, finishReason: 'max_steps', stepsTaken: steps };
+  return {
+    content: finalContent,
+    finishReason: 'max_steps',
+    stepsTaken: steps,
+    reasoningSteps: completedReasoningSteps,
+  };
 }
 
 /**
@@ -478,7 +727,7 @@ ${skillDescriptionsGet}
 
 IMPORTANT RULES:
 1. When the user asks "what can you do", "what skills do you have", or similar questions about your capabilities, you MUST list ONLY the skills shown above.
-2. Do NOT mention internal tools (like file_reader, file_writer, bash_executor, web_search, ppt_generator, etc.) - these are internal implementation details.
+2. Do NOT mention internal tools (like file_reader, file_writer, bash_executor, web_search, paper_search, ppt_generator, etc.) - these are internal implementation details.
 3. Do NOT make up or invent capabilities beyond the enabled skills listed above.
 4. Do NOT list generic AI capabilities like "programming", "data analysis", "writing", etc. unless they are explicitly in the enabled skills list.
 5. If a skill is not in the list above, you do NOT have that capability.`;
@@ -530,11 +779,9 @@ IMPORTANT RULES:
   const toolRegistry = getToolRegistry(toolContext);
   const tools = config.tools.enabled.length > 0 ? toolRegistry.toOpenAIFunctions(config.tools.enabled) : undefined;
 
-  // Initialize task if not already tracking
-  let taskState = taskManager.getTaskState(sessionId);
-  if (!taskState) {
-    taskState = taskManager.initializeTask(sessionId, user.userId, latestUserMessage.content);
-  }
+  // Always initialize fresh task per user message (one task per request-response cycle)
+  taskManager.clearTask(sessionId);
+  const taskState = taskManager.initializeTask(sessionId, user.userId, latestUserMessage.content);
 
   return streamSSE(c, async (sseStream) => {
     const llmClient = getLLMClient();
@@ -597,8 +844,14 @@ IMPORTANT RULES:
             finishReason: result.finishReason,
             model: llmClient.getModel(),
             stepsTaken: result.stepsTaken,
+            reasoningSteps: result.reasoningSteps,
           },
         },
+      });
+
+      await prisma.toolCall.updateMany({
+        where: { sessionId, messageId: null },
+        data: { messageId: assistantMessage.id },
       });
 
       // Update session lastActiveAt
@@ -808,7 +1061,7 @@ ${skillDescriptions}
 
 IMPORTANT RULES:
 1. When the user asks "what can you do", "what skills do you have", or similar questions about your capabilities, you MUST list ONLY the skills shown above.
-2. Do NOT mention internal tools (like file_reader, file_writer, bash_executor, web_search, ppt_generator, etc.) - these are internal implementation details.
+2. Do NOT mention internal tools (like file_reader, file_writer, bash_executor, web_search, paper_search, ppt_generator, etc.) - these are internal implementation details.
 3. Do NOT make up or invent capabilities beyond the enabled skills listed above.
 4. Do NOT list generic AI capabilities like "programming", "data analysis", "writing", etc. unless they are explicitly in the enabled skills list.
 5. If a skill is not in the list above, you do NOT have that capability.`;
@@ -866,14 +1119,10 @@ IMPORTANT RULES:
   const enabledTools = skillTools || config.tools.enabled;
   const tools = enabledTools.length > 0 ? toolRegistry.toOpenAIFunctions(enabledTools) : undefined;
 
-  // Initialize or get TaskManager for this session
+  // Always initialize fresh task per user message (one task per request-response cycle)
   const taskManager = getTaskManager();
-  let taskState = taskManager.getTaskState(sessionId);
-
-  // Clear previous task if this is a new user request (not a progress query)
-  if (!taskState || !taskManager.getSystemPromptContext(sessionId)) {
-    taskState = taskManager.initializeTask(sessionId, user.userId, content);
-  }
+  taskManager.clearTask(sessionId);
+  const taskState = taskManager.initializeTask(sessionId, user.userId, content);
 
   return streamSSE(c, async (sseStream) => {
     const llmClient = getLLMClient();
@@ -943,8 +1192,14 @@ IMPORTANT RULES:
             finishReason: result.finishReason,
             model: llmClient.getModel(),
             stepsTaken: result.stepsTaken,
+            reasoningSteps: result.reasoningSteps,
           },
         },
+      });
+
+      await prisma.toolCall.updateMany({
+        where: { sessionId, messageId: null },
+        data: { messageId: assistantMessage.id },
       });
 
       // Update session lastActiveAt
@@ -1163,8 +1418,14 @@ stream.post('/sessions/:sessionId/agent', async (c) => {
               scenario: finalState.parsedIntent?.scenario,
               executionPath: result.executionPath,
               duration: result.totalDuration,
+              reasoningSteps: [],
             },
           },
+        });
+
+        await prisma.toolCall.updateMany({
+          where: { sessionId, messageId: null },
+          data: { messageId: assistantMessage.id },
         });
 
         // Send completion events

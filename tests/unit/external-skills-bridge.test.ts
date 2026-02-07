@@ -32,7 +32,7 @@ describe('ExternalSkillAdapter', () => {
 
     const productSkill = adapter.toProductSkill(skill);
 
-    expect(productSkill.name).toBe('test-skill');
+    expect(productSkill.name).toBe('Test Skill');
     expect(productSkill.description).toBe('Test description');
     expect(productSkill.category).toBe('development');
     expect(productSkill.requiredTools.length).toBeGreaterThan(0);

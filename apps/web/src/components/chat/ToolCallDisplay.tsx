@@ -1,26 +1,17 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, CheckCircle, XCircle, Loader2, Search, Download } from 'lucide-react';
+import { ChevronRight, Loader2, Search, Download } from 'lucide-react';
 import { useChatStore } from '../../stores/chatStore';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { cn } from '../../lib/utils';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { ArtifactDisplay } from './ArtifactDisplay';
-import { filesApi } from '../../lib/api';
+import { triggerDownload } from '../../lib/download';
+import { StatusIcon } from '../ui/status-icon';
 
 interface ToolCallDisplayProps {
   sessionId: string;
 }
-
-// Animated pulsing dots for in-progress status
-const PulsingDots = () => (
-  <span className="flex items-center gap-1">
-    <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
-    <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
-    <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
-  </span>
-);
 
 // Shimmer effect for loading content
 const Shimmer = ({ className }: { className?: string }) => (
@@ -61,15 +52,7 @@ async function handleDownload(
   }
 
   try {
-    const blob = await filesApi.download(sessionId, fileId);
-    const downloadUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(downloadUrl);
+    await triggerDownload(sessionId, fileId, filename);
   } catch (error) {
     console.error('Download failed:', error);
     alert(`Failed to download file: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -82,20 +65,27 @@ export function ToolCallDisplay({ sessionId }: ToolCallDisplayProps) {
 
   // Show all non-pending calls - pending calls are already shown as 'running' when started
   const sessionToolCalls = Array.from(toolCalls.values()).filter(
-    (call) => call.status !== 'pending'
+    (call) => call.status !== 'pending' && call.sessionId === sessionId
   );
+
+  const groupedToolCalls = new Map<string, typeof sessionToolCalls>();
+  for (const call of sessionToolCalls) {
+    const existing = groupedToolCalls.get(call.toolName) || [];
+    existing.push(call);
+    groupedToolCalls.set(call.toolName, existing);
+  }
 
   if (sessionToolCalls.length === 0) {
     return null;
   }
 
-  const toggleExpand = (toolCallId: string) => {
+  const toggleExpand = (toolName: string) => {
     setExpandedCalls((prev) => {
       const next = new Set(prev);
-      if (next.has(toolCallId)) {
-        next.delete(toolCallId);
+      if (next.has(toolName)) {
+        next.delete(toolName);
       } else {
-        next.add(toolCallId);
+        next.add(toolName);
       }
       return next;
     });
@@ -123,55 +113,75 @@ export function ToolCallDisplay({ sessionId }: ToolCallDisplayProps) {
           )}
         </span>
       </div>
-      {sessionToolCalls.map((toolCall) => {
-        const isExpanded = expandedCalls.has(toolCall.toolCallId);
-        const isRunning = toolCall.status === 'running';
+      {Array.from(groupedToolCalls.entries()).map(([toolName, toolCallGroup]) => {
+        const completedCall = toolCallGroup.find((call) => call.status === 'completed');
+        const runningCall = toolCallGroup.find((call) => call.status === 'running');
+        const latestCall = toolCallGroup[toolCallGroup.length - 1];
+        const representativeCall = completedCall || runningCall || latestCall;
+        const failedCount = toolCallGroup.filter((call) => call.status === 'failed').length;
+        const latestFailedCall = [...toolCallGroup].reverse().find((call) => call.status === 'failed');
+
+        const isExpanded = expandedCalls.has(toolName);
+        const isRunning = representativeCall.status === 'running';
 
         return (
           <Card
-            key={toolCall.toolCallId}
+            key={toolName}
             className={cn(
               'text-sm transition-all duration-200',
               isRunning && 'border-blue-200 bg-blue-50/30',
-              toolCall.status === 'completed' && 'border-green-200 bg-green-50/20',
-              toolCall.status === 'failed' && 'border-red-200 bg-red-50/20'
+              representativeCall.status === 'completed' && 'border-green-200 bg-green-50/20',
+              representativeCall.status === 'failed' && 'border-red-200 bg-red-50/20'
             )}
           >
-            <CardHeader className="p-3 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => toggleExpand(toolCall.toolCallId)}>
-              <div className="flex items-center justify-between">
+            <CardHeader
+              className="flex cursor-pointer items-center gap-2 rounded-md p-3 transition-colors hover:bg-muted/50"
+              onClick={() => toggleExpand(toolName)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  toggleExpand(toolName);
+                }
+              }}
+              aria-expanded={isExpanded}
+              aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+            >
+              <div className="flex w-full items-center justify-between">
                 <div className="flex items-center gap-2">
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
+                  <ChevronRight
+                    className={cn(
+                      'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200',
+                      isExpanded && 'rotate-90'
+                    )}
+                  />
                   {isRunning && <Search className="h-4 w-4 text-blue-500 animate-pulse" />}
                   <CardTitle className="text-sm font-medium">
-                    {toolCall.toolName}
+                    {toolName}
                   </CardTitle>
                 </div>
                 {/* Show Download button for completed ppt_generator, otherwise show status badge */}
-                {toolCall.toolName === 'ppt_generator' && 
-                 toolCall.status === 'completed' && 
-                 toolCall.result?.artifacts?.[0]?.fileId ? (
+                {toolName === 'ppt_generator' && 
+                 completedCall?.result?.artifacts?.[0]?.fileId ? (
                   <button
                     onClick={(e) => handleDownload(
                       e, 
                       sessionId, 
-                      toolCall.result?.artifacts?.[0]?.fileId, 
-                      toolCall.result?.artifacts?.[0]?.name || 'presentation.pptx'
+                      completedCall?.result?.artifacts?.[0]?.fileId, 
+                      completedCall?.result?.artifacts?.[0]?.name || 'presentation.pptx'
                     )}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded hover:bg-primary/90 transition-colors cursor-pointer"
                   >
                     <Download className="h-3.5 w-3.5" />
-                    Download PPT
+                    Download
                   </button>
                 ) : (
                   <Badge
                     variant={
-                      toolCall.status === 'completed'
+                      representativeCall.status === 'completed'
                         ? 'default'
-                        : toolCall.status === 'failed'
+                        : representativeCall.status === 'failed'
                         ? 'destructive'
                         : 'secondary'
                     }
@@ -180,12 +190,16 @@ export function ToolCallDisplay({ sessionId }: ToolCallDisplayProps) {
                       isRunning && 'bg-blue-100 text-blue-700 hover:bg-blue-100'
                     )}
                   >
-                    {toolCall.status === 'running' && <PulsingDots />}
-                    {toolCall.status === 'completed' && (
-                      <CheckCircle className="h-3 w-3" />
-                    )}
-                    {toolCall.status === 'failed' && <XCircle className="h-3 w-3" />}
-                    <span>{getStatusLabel(toolCall.status, toolCall.toolName)}</span>
+                    <StatusIcon
+                      status={
+                        representativeCall.status === 'running'
+                          ? 'running'
+                          : representativeCall.status === 'failed'
+                          ? 'failed'
+                          : 'completed'
+                      }
+                      size="sm"
+                    />
                   </Badge>
                 )}
               </div>
@@ -199,7 +213,7 @@ export function ToolCallDisplay({ sessionId }: ToolCallDisplayProps) {
                     Parameters:
                   </div>
                   {/* Show shimmer only if running AND no params yet */}
-                  {isRunning && (!toolCall.params || Object.keys(toolCall.params).length === 0) ? (
+                  {isRunning && (!representativeCall.params || Object.keys(representativeCall.params).length === 0) ? (
                     <Shimmer className="h-20 rounded w-full" />
                   ) : (
                     <SyntaxHighlighter
@@ -207,31 +221,19 @@ export function ToolCallDisplay({ sessionId }: ToolCallDisplayProps) {
                       style={oneDark as any}
                       customStyle={{ margin: 0, borderRadius: '4px', fontSize: '11px' }}
                     >
-                      {JSON.stringify(toolCall.params, null, 2)}
+                      {JSON.stringify(representativeCall.params, null, 2)}
                     </SyntaxHighlighter>
                   )}
                 </div>
 
-                {/* Artifacts */}
-                {toolCall.result?.artifacts && toolCall.result.artifacts.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-muted-foreground mb-1">
-                      Generated Files:
-                    </div>
-                    {toolCall.result.artifacts.map((artifact, idx) => (
-                      <ArtifactDisplay key={idx} artifact={artifact} sessionId={sessionId} />
-                    ))}
-                  </div>
-                )}
-
                 {/* Result (only show if no artifacts and not running) */}
-                {toolCall.result && (!toolCall.result.artifacts || toolCall.result.artifacts.length === 0) && toolCall.status !== 'running' && (
+                {representativeCall.result && (!representativeCall.result.artifacts || representativeCall.result.artifacts.length === 0) && representativeCall.status !== 'running' && (
                   <div>
                     <div className="text-xs font-medium text-muted-foreground mb-1">
                       Result:
                     </div>
                     <pre className="text-xs bg-secondary p-2 rounded overflow-auto max-h-96">
-                      {toolCall.result.output}
+                      {representativeCall.result.output}
                     </pre>
                   </div>
                 )}
@@ -240,18 +242,25 @@ export function ToolCallDisplay({ sessionId }: ToolCallDisplayProps) {
                 {isRunning && (
                   <div className="text-xs text-blue-600 flex items-center gap-2">
                     <Loader2 className="h-3 w-3 animate-spin" />
-                    <span>{getStatusLabel(toolCall.status, toolCall.toolName)}</span>
+                    <span>{getStatusLabel(representativeCall.status, toolName)}</span>
+                  </div>
+                )}
+
+                {/* Failed attempts */}
+                {failedCount > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    {failedCount} failed attempt{failedCount === 1 ? '' : 's'}
                   </div>
                 )}
 
                 {/* Error */}
-                {toolCall.error && (
+                {latestFailedCall?.error && (
                   <div>
                     <div className="text-xs font-medium text-destructive mb-1">
                       Error:
                     </div>
                     <pre className="text-xs bg-destructive/10 text-destructive p-2 rounded overflow-auto max-h-96">
-                      {toolCall.error}
+                      {latestFailedCall.error}
                     </pre>
                   </div>
                 )}

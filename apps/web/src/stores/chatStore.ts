@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import type { Message, ToolResult, Artifact, TableIR, TableIRSchema } from '@mark/shared';
 
 interface ToolCallStatus {
+  sessionId: string;
+  messageId?: string;
   toolCallId: string;
   toolName: string;
   params: any;
@@ -12,6 +14,22 @@ interface ToolCallStatus {
     current: number;
     total: number;
     message?: string;
+  };
+}
+
+interface ReasoningStep {
+  stepId: string;
+  label: string;
+  status: 'running' | 'completed';
+  startedAt: number;
+  completedAt?: number;
+  durationMs?: number;
+  message?: string;
+  thinkingContent?: string;
+  details?: {
+    queries?: string[];
+    sources?: string[];
+    toolName?: string;
   };
 }
 
@@ -35,6 +53,14 @@ interface CompletedTableState {
   isStreaming: false;
 }
 
+const SIDEBAR_OPEN_STORAGE_KEY = 'sidebar-open';
+
+const getInitialSidebarOpen = () => {
+  const stored = localStorage.getItem(SIDEBAR_OPEN_STORAGE_KEY);
+  if (stored === null) return true;
+  return stored === 'true';
+};
+
 interface ChatState {
   // Messages by session ID
   messages: Map<string, Message[]>;
@@ -48,6 +74,9 @@ interface ChatState {
   // Tool calls state
   toolCalls: Map<string, ToolCallStatus>;
 
+  // Reasoning steps by session ID
+  reasoningSteps: Map<string, ReasoningStep[]>;
+
   // File artifacts by session ID (for file.created events)
   files: Map<string, Artifact[]>;
 
@@ -56,6 +85,12 @@ interface ChatState {
   streamingTables: Map<string, StreamingTableState>;
   // Completed tables have full TableIR data
   completedTables: Map<string, CompletedTableState>;
+
+  // Inspector UI state
+  inspectorOpen: boolean;
+  inspectorTab: 'reasoning' | 'tools' | 'sources';
+  sidebarOpen: boolean;
+  selectedMessageId: string | null;
 
   // Actions - Messages
   setMessages: (sessionId: string, messages: Message[]) => void;
@@ -71,11 +106,18 @@ interface ChatState {
   setThinking: (isThinking: boolean) => void;
 
   // Actions - Tool calls
-  startToolCall: (toolCallId: string, toolName: string, params: any) => void;
+  startToolCall: (sessionId: string, toolCallId: string, toolName: string, params: any) => void;
   updateToolCall: (toolCallId: string, updates: Partial<ToolCallStatus>) => void;
   updateToolCallProgress: (toolCallId: string, current: number, total: number, message?: string) => void;
   completeToolCall: (toolCallId: string, result: ToolResult) => void;
-  clearToolCalls: () => void;
+  associateToolCallsWithMessage: (sessionId: string, messageId: string) => void;
+  clearToolCalls: (sessionId?: string) => void;
+
+  // Actions - Reasoning steps
+  addReasoningStep: (sessionId: string, step: ReasoningStep) => void;
+  updateReasoningStep: (sessionId: string, stepId: string, updates: Partial<ReasoningStep>) => void;
+  completeReasoningStep: (sessionId: string, stepId: string, completedAt: number) => void;
+  clearReasoningSteps: (sessionId?: string) => void;
 
   // Actions - Files
   addFileArtifact: (sessionId: string, artifact: Artifact) => void;
@@ -86,6 +128,12 @@ interface ChatState {
   completeTableBlock: (tableId: string, table: TableIR) => void;
   getTableState: (tableId: string) => StreamingTableState | CompletedTableState | null;
   clearTables: () => void;
+
+  // Actions - Inspector
+  setInspectorOpen: (open: boolean) => void;
+  setInspectorTab: (tab: 'reasoning' | 'tools' | 'sources') => void;
+  setSidebarOpen: (open: boolean) => void;
+  setSelectedMessageId: (messageId: string | null) => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -96,9 +144,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isStreaming: false,
   isThinking: false,
   toolCalls: new Map(),
+  reasoningSteps: new Map(),
   files: new Map(),
   streamingTables: new Map(),
   completedTables: new Map(),
+  inspectorOpen: false,
+  inspectorTab: 'tools',
+  sidebarOpen: getInitialSidebarOpen(),
+  selectedMessageId: null,
 
   // Set messages for a session
   setMessages: (sessionId: string, messages: Message[]) => {
@@ -148,6 +201,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       streamingContent: '',
       isStreaming: true,
       isThinking: true, // Thinking until first token arrives
+      selectedMessageId: null, // Clear message selection so inspector shows live data
     });
   },
 
@@ -191,10 +245,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   // Start a tool call
-  startToolCall: (toolCallId: string, toolName: string, params: any) => {
+  startToolCall: (sessionId: string, toolCallId: string, toolName: string, params: any) => {
     set((state) => {
       const newToolCalls = new Map(state.toolCalls);
       newToolCalls.set(toolCallId, {
+        sessionId,
         toolCallId,
         toolName,
         params,
@@ -248,9 +303,92 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
+  // Associate tool calls with a completed assistant message
+  associateToolCallsWithMessage: (sessionId: string, messageId: string) => {
+    set((state) => {
+      const newToolCalls = new Map(state.toolCalls);
+      for (const [toolCallId, toolCall] of newToolCalls.entries()) {
+        if (toolCall.sessionId === sessionId && !toolCall.messageId) {
+          newToolCalls.set(toolCallId, { ...toolCall, messageId });
+        }
+      }
+      return { toolCalls: newToolCalls };
+    });
+  },
+
   // Clear all tool calls
-  clearToolCalls: () => {
-    set({ toolCalls: new Map() });
+  clearToolCalls: (sessionId?: string) => {
+    if (!sessionId) {
+      set({ toolCalls: new Map() });
+      return;
+    }
+
+    set((state) => {
+      const newToolCalls = new Map(state.toolCalls);
+      for (const [toolCallId, toolCall] of newToolCalls.entries()) {
+        if (toolCall.sessionId === sessionId) {
+          newToolCalls.delete(toolCallId);
+        }
+      }
+      return { toolCalls: newToolCalls };
+    });
+  },
+
+  // Add a reasoning step
+  addReasoningStep: (sessionId: string, step: ReasoningStep) => {
+    set((state) => {
+      const newReasoningSteps = new Map(state.reasoningSteps);
+      const stepsForSession = newReasoningSteps.get(sessionId) || [];
+      newReasoningSteps.set(sessionId, [...stepsForSession, step]);
+      return { reasoningSteps: newReasoningSteps };
+    });
+  },
+
+  // Update a reasoning step
+  updateReasoningStep: (sessionId: string, stepId: string, updates: Partial<ReasoningStep>) => {
+    set((state) => {
+      const newReasoningSteps = new Map(state.reasoningSteps);
+      const stepsForSession = newReasoningSteps.get(sessionId) || [];
+      const updatedSteps = stepsForSession.map((step) =>
+        step.stepId === stepId ? { ...step, ...updates } : step
+      );
+      newReasoningSteps.set(sessionId, updatedSteps);
+      return { reasoningSteps: newReasoningSteps };
+    });
+  },
+
+  // Complete a reasoning step
+  completeReasoningStep: (sessionId: string, stepId: string, completedAt: number) => {
+    set((state) => {
+      const newReasoningSteps = new Map(state.reasoningSteps);
+      const stepsForSession = newReasoningSteps.get(sessionId) || [];
+      const updatedSteps = stepsForSession.map((step) => {
+        if (step.stepId !== stepId) return step;
+        const durationMs = completedAt - step.startedAt;
+        return {
+          ...step,
+          status: 'completed',
+          completedAt,
+          durationMs,
+        };
+      });
+      newReasoningSteps.set(sessionId, updatedSteps);
+      return { reasoningSteps: newReasoningSteps };
+    });
+  },
+
+  // Clear reasoning steps
+  clearReasoningSteps: (sessionId?: string) => {
+    if (!sessionId) {
+      set({ reasoningSteps: new Map() });
+      return;
+    }
+
+    set((state) => {
+      const newReasoningSteps = new Map(state.reasoningSteps);
+      newReasoningSteps.delete(sessionId);
+      return { reasoningSteps: newReasoningSteps };
+    });
   },
 
   // Add a file artifact
@@ -324,5 +462,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
       streamingTables: new Map(),
       completedTables: new Map(),
     });
+  },
+
+  setInspectorOpen: (open: boolean) => {
+    set({ inspectorOpen: open });
+  },
+
+  setInspectorTab: (tab: 'reasoning' | 'tools' | 'sources') => {
+    set({ inspectorTab: tab });
+  },
+
+  setSidebarOpen: (open: boolean) => {
+    localStorage.setItem(SIDEBAR_OPEN_STORAGE_KEY, String(open));
+    set({ sidebarOpen: open });
+  },
+
+  setSelectedMessageId: (messageId: string | null) => {
+    set({ selectedMessageId: messageId });
   },
 }));

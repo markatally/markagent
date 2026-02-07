@@ -1,4 +1,4 @@
-import { LogOut, Menu, X, GripVertical } from 'lucide-react';
+import { LogOut, Menu, X, GripVertical, PanelLeftClose } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../ui/button';
@@ -14,9 +14,11 @@ const STORAGE_KEY = 'sidebar-width';
 
 interface SidebarProps {
   className?: string;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export function Sidebar({ className }: SidebarProps) {
+export function Sidebar({ className, collapsed = false, onToggleCollapse }: SidebarProps) {
   const { user, logout } = useAuth();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [width, setWidth] = useState(() => {
@@ -80,10 +82,11 @@ export function Sidebar({ className }: SidebarProps) {
       {/* Sidebar */}
       <aside
         ref={sidebarRef}
-        style={{ width: `${width}px` }}
+        style={{ width: `${collapsed && !isMobileOpen ? 0 : width}px` }}
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex flex-col border-r bg-background transition-transform duration-200 md:relative md:translate-x-0',
+          'fixed inset-y-0 left-0 z-40 flex flex-col border-r bg-background transition-transform duration-200 md:relative',
           isMobileOpen ? 'translate-x-0' : '-translate-x-full',
+          collapsed ? 'md:-translate-x-full md:overflow-hidden' : 'md:translate-x-0',
           isResizing && 'transition-none',
           className
         )}
@@ -91,6 +94,17 @@ export function Sidebar({ className }: SidebarProps) {
         {/* Header */}
         <div className="flex h-16 items-center justify-between border-b px-4">
           <h1 className="text-lg font-semibold">Mark Agent</h1>
+          {onToggleCollapse ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hidden md:inline-flex"
+              onClick={onToggleCollapse}
+              aria-label="Collapse sidebar"
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </Button>
+          ) : null}
         </div>
 
         {/* New Session Button */}
@@ -126,20 +140,22 @@ export function Sidebar({ className }: SidebarProps) {
         </div>
 
         {/* Resize handle - only visible on desktop */}
-        <div
-          onMouseDown={handleMouseDown}
-          className={cn(
-            'absolute top-0 right-0 h-full w-1 cursor-col-resize hidden md:flex items-center justify-center group hover:bg-primary/20 transition-colors',
-            isResizing && 'bg-primary/30'
-          )}
-        >
-          <div className={cn(
-            'absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-4 h-8 flex items-center justify-center rounded bg-border opacity-0 group-hover:opacity-100 transition-opacity',
-            isResizing && 'opacity-100 bg-primary/50'
-          )}>
-            <GripVertical className="h-3 w-3 text-muted-foreground" />
+        {!collapsed ? (
+          <div
+            onMouseDown={handleMouseDown}
+            className={cn(
+              'absolute top-0 right-0 h-full w-1 cursor-col-resize hidden md:flex items-center justify-center group hover:bg-primary/20 transition-colors',
+              isResizing && 'bg-primary/30'
+            )}
+          >
+            <div className={cn(
+              'absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-4 h-8 flex items-center justify-center rounded bg-border opacity-0 group-hover:opacity-100 transition-opacity',
+              isResizing && 'opacity-100 bg-primary/50'
+            )}>
+              <GripVertical className="h-3 w-3 text-muted-foreground" />
+            </div>
           </div>
-        </div>
+        ) : null}
       </aside>
 
       {/* Overlay for mobile */}

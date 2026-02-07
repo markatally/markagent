@@ -15,32 +15,35 @@ export interface AuthContext {
  */
 export async function requireAuth(c: Context, next: Next) {
   const authHeader = c.req.header('Authorization');
+  let token = '';
 
-  if (!authHeader) {
-    return c.json(
-      {
-        error: {
-          code: 'UNAUTHORIZED',
-          message: 'Authorization header is required',
+  if (authHeader) {
+    // Extract token from "Bearer <token>"
+    token = authHeader.replace(/^Bearer\s+/i, '');
+    if (!token) {
+      return c.json(
+        {
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Invalid authorization header format',
+          },
         },
-      },
-      401
-    );
-  }
-
-  // Extract token from "Bearer <token>"
-  const token = authHeader.replace(/^Bearer\s+/i, '');
-
-  if (!token) {
-    return c.json(
-      {
-        error: {
-          code: 'UNAUTHORIZED',
-          message: 'Invalid authorization header format',
+        401
+      );
+    }
+  } else {
+    token = c.req.query('token') || '';
+    if (!token) {
+      return c.json(
+        {
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Authorization header or token query parameter is required',
+          },
         },
-      },
-      401
-    );
+        401
+      );
+    }
   }
 
   try {

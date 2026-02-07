@@ -12,6 +12,7 @@ import {
   getFile,
   deleteFile as deleteFileFromDisk,
 } from '../services/files';
+import { generateDownloadToken } from '../services/auth';
 import path from 'path';
 
 const files = new Hono<AuthContext>();
@@ -184,6 +185,65 @@ files.get('/sessions/:sessionId/files', async (c) => {
       mimeType: f.mimeType,
       createdAt: f.createdAt.toISOString(),
     })),
+  });
+});
+
+/**
+ * POST /api/sessions/:sessionId/files/:fileId/download-token
+ * Generate a temporary download token for a file
+ */
+files.post('/sessions/:sessionId/files/:fileId/download-token', async (c) => {
+  const user = c.get('user');
+  const sessionId = c.req.param('sessionId');
+  const fileId = c.req.param('fileId');
+
+  // Verify session exists and belongs to user
+  const session = await prisma.session.findUnique({
+    where: {
+      id: sessionId,
+      userId: user.userId,
+    },
+  });
+
+  if (!session) {
+    return c.json(
+      {
+        error: {
+          code: 'SESSION_NOT_FOUND',
+          message: 'Session not found',
+        },
+      },
+      404
+    );
+  }
+
+  // Verify file exists and belongs to session
+  const dbFile = await prisma.file.findUnique({
+    where: {
+      id: fileId,
+      sessionId,
+    },
+  });
+
+  if (!dbFile) {
+    return c.json(
+      {
+        error: {
+          code: 'FILE_NOT_FOUND',
+          message: 'File not found',
+        },
+      },
+      404
+    );
+  }
+
+  // Generate download token
+  const token = generateDownloadToken(user.userId, sessionId, fileId);
+  const url = `/api/public/download?token=${token}`;
+
+  return c.json({
+    token,
+    url,
   });
 });
 

@@ -43,3 +43,18 @@ Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
   configurable: true,
   value: 800,
 });
+
+Object.defineProperty(HTMLElement.prototype, 'getBoundingClientRect', {
+  configurable: true,
+  value: () => ({
+    width: 800,
+    height: 600,
+    top: 0,
+    left: 0,
+    bottom: 600,
+    right: 800,
+    x: 0,
+    y: 0,
+    toJSON: () => {},
+  }),
+});
