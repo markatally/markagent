@@ -58,9 +58,10 @@ test.describe('Computer tab and step screenshots', () => {
     ).toBeVisible({ timeout: 10000 });
   });
 
-  test.skip(!!process.env.CI)('sending PPT message shows placeholder then step screenshots can appear', async ({
+  test('sending PPT message shows placeholder then step screenshots can appear', async ({
     page,
   }) => {
+    test.skip(!!process.env.CI, 'skip in CI');
     await login(page);
 
     const newChatBtn = page.locator('[data-testid="new-chat-button"]');

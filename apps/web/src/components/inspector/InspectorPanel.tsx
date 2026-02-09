@@ -25,25 +25,6 @@ export function InspectorPanel({ open, sessionId, onClose }: InspectorPanelProps
   const setInspectorTab = useChatStore((state) => state.setInspectorTab);
   const toolCalls = useChatStore((state) => state.toolCalls);
   const selectedMessageId = useChatStore((state) => state.selectedMessageId);
-  const executionMode = useChatStore((state) => state.executionMode);
-  const terminalLines = useChatStore((state) =>
-    sessionId ? state.terminalLines.get(sessionId) || [] : []
-  );
-  const executionSteps = useChatStore((state) =>
-    sessionId ? state.executionSteps.get(sessionId) || [] : []
-  );
-  const sandboxFiles = useChatStore((state) =>
-    sessionId ? state.sandboxFiles.get(sessionId) || [] : []
-  );
-  const isPptTask = useChatStore((state) =>
-    sessionId ? state.isPptTask.get(sessionId) || false : false
-  );
-  const browserSessionActive = useChatStore((state) =>
-    sessionId ? (state.browserSession.get(sessionId)?.active ?? false) : false
-  );
-  const hasAgentSteps = useChatStore((state) =>
-    sessionId ? (state.agentSteps.get(sessionId)?.steps.length ?? 0) > 0 : false
-  );
   const [width, setWidth] = useState(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     return stored
@@ -106,15 +87,7 @@ export function InspectorPanel({ open, sessionId, onClose }: InspectorPanelProps
         .reverse()
     : [];
 
-  const showComputerTab =
-    !!sessionId &&
-    (executionMode === 'sandbox' ||
-      terminalLines.length > 0 ||
-      executionSteps.length > 0 ||
-      sandboxFiles.length > 0 ||
-      isPptTask ||
-      browserSessionActive ||
-      hasAgentSteps);
+  const showComputerTab = !!sessionId;
 
   return (
     <aside

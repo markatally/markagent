@@ -78,6 +78,24 @@ function sanitizeQueryWithTimeIntent(
   return cleaned || originalQuery;
 }
 
+function extractSearchTopicQuery(originalQuery: string): string {
+  let cleaned = originalQuery;
+
+  // Remove presentation/task framing that hurts academic API retrieval quality.
+  cleaned = cleaned
+    .replace(
+      /\b(?:and|then)?\s*(?:generate|create|make|build)\s+(?:a\s+)?(?:presentation|ppt|pptx|slides?|deck)\b.*$/i,
+      ' '
+    )
+    .replace(/\b(?:for|as)\s+(?:a\s+)?(?:tech|technical)\s+talk\b/i, ' ')
+    .replace(/\b(?:collect|find|get|search|look up|show me)\b/gi, ' ')
+    .replace(/\b(?:top|best|hottest|most popular)\s+\d+\b/gi, ' ')
+    .replace(/\b(?:paper|papers|research|article|articles)\b/gi, ' ');
+
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  return cleaned || originalQuery;
+}
+
 function inferRankingRule(
   query: string,
   explicitSortBy?: string
@@ -227,7 +245,10 @@ export class PaperSearchTool implements Tool {
         console.log(`[PaperSearchTool] Time range parsed: ${describeTimeWindow(absoluteDateWindow)}`);
       }
 
-      const searchQuery = sanitizeQueryWithTimeIntent(query, absoluteDateWindow);
+      const searchQuery = sanitizeQueryWithTimeIntent(
+        extractSearchTopicQuery(query),
+        absoluteDateWindow
+      );
 
       onProgress?.(0, 100, 'Preparing search...');
       const skillIds = SOURCE_TO_SKILL_IDS[sourcesParam] ?? DEFAULT_PAPER_SEARCH_SKILL_IDS;
@@ -338,6 +359,13 @@ export class PaperSearchTool implements Tool {
       // CRITICAL: Zero results is NOT an error - it's informational
       // The agent should use this information to trigger recovery strategies
       // rather than treating it as a fatal failure
+      const hasProviderError = out.sourcesQueried.length === 0 && out.sourcesSkipped.length > 0;
+      const searchStatus = hasProviderError
+        ? 'provider_error'
+        : papers.length === 0
+          ? 'zero_results'
+          : 'success';
+
       const artifactPayload = {
         query,
         searchQuery,
@@ -361,8 +389,11 @@ export class PaperSearchTool implements Tool {
         } : undefined,
         // Explicit flag for downstream consumers
         zeroResults: papers.length === 0,
+        searchStatus,
         suggestion: papers.length === 0
-          ? (isStrict
+          ? (hasProviderError
+              ? 'Search providers returned errors. Retry shortly or try a different source/topic query.'
+              : isStrict
               ? `No papers found within the strict time window [${absoluteDateWindow?.startDate} to ${absoluteDateWindow?.endDate}]. The time constraint was enforced as requested.`
               : 'Try broader terms, remove date filters, or reformulate the query')
           : undefined,
@@ -384,7 +415,9 @@ export class PaperSearchTool implements Tool {
         ],
         // Provide informational warning (not error) for zero results
         ...(papers.length === 0 && {
-          warning: `No papers found for query "${query}". Consider reformulating the query.`,
+          warning: hasProviderError
+            ? `Search providers failed for query "${query}". Check provider availability and retry.`
+            : `No papers found for query "${query}". Consider reformulating the query.`,
         }),
       };
     } catch (error: unknown) {

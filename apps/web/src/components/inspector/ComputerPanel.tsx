@@ -190,27 +190,38 @@ export function ComputerPanel({ sessionId }: ComputerPanelProps) {
   const selectedStepTitle = selectedAgentStep?.snapshot?.metadata?.actionDescription;
   const isAtLatestAgentStep = agentSteps.length === 0 || agentCurrentIndex >= agentSteps.length - 1;
 
-  if (isBrowserMode && !(isPptTask && pptPipeline)) {
-    const hasAgentTimeline = agentSteps.length > 0;
+  const hasAgentTimeline = agentSteps.length > 0;
+  const hasReplayTimeline = hasAgentTimeline || browserActions.length > 0;
+
+  if (hasReplayTimeline && !(isPptTask && pptPipeline)) {
     const replayIndex = hasAgentTimeline ? agentCurrentIndex : browserCurrentIndex;
     const replayTotal = hasAgentTimeline ? agentSteps.length : browserActions.length;
-    const replayLive = hasAgentTimeline ? isAtLatestAgentStep : isAtLatestAction;
+    const replayLive =
+      isBrowserMode && (hasAgentTimeline ? isAtLatestAgentStep : isAtLatestAction);
     const replaySnapshot = hasAgentTimeline
-      ? selectedSnapshotUrl
-      : browserActions[browserCurrentIndex]?.screenshotDataUrl ?? null;
+      ? selectedSnapshotUrl ??
+        getNearestTimelineScreenshot(agentSteps, agentCurrentIndex) ??
+        getLatestBrowserActionScreenshot(browserActions)
+      : browserActions[browserCurrentIndex]?.screenshotDataUrl ??
+        getLatestBrowserActionScreenshot(browserActions);
     return (
       <div className="space-y-4">
         <section className="rounded-xl border bg-muted/10">
           <div className="flex items-center justify-between gap-2 px-4 py-3">
             <div className="text-sm font-medium text-foreground">Computer</div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              Live
+              <span
+                className={cn(
+                  'h-2 w-2 rounded-full',
+                  replayLive ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground/50'
+                )}
+              />
+              {replayLive ? 'Live' : 'Complete'}
             </div>
           </div>
           <div className="space-y-3 px-4 pb-4">
             <BrowserToolbar
-              status={browserSession?.status ?? 'active'}
+              status={browserSession?.status ?? (isBrowserMode ? 'active' : 'closed')}
               currentUrl={selectedStepUrl}
               currentTitle={selectedStepTitle ?? displayTitle ?? browserSession?.currentTitle}
               actionLabel={selectedStepTitle ?? actionLabel}
@@ -249,6 +260,14 @@ export function ComputerPanel({ sessionId }: ComputerPanelProps) {
               showBackForwardLabels
               stepLabel="Step"
             />
+            {!replaySnapshot && (
+              <div
+                data-testid="computer-viewport-placeholder"
+                className="rounded-lg border border-dashed bg-muted/20 px-4 py-3 text-xs text-muted-foreground"
+              >
+                Snapshot unavailable for this step. Agent execution continued without blocking.
+              </div>
+            )}
           </div>
         </section>
       </div>
@@ -499,6 +518,38 @@ export function ComputerPanel({ sessionId }: ComputerPanelProps) {
                 />
                 {currentStepStatus === 'completed' ? 'Completed' : currentStepStatus === 'running' ? 'Active' : 'Pending'}
               </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  if (orderedSteps.length === 0 && terminalLines.length === 0 && sandboxFiles.length === 0) {
+    return (
+      <div className="space-y-4">
+        <section className="rounded-xl border bg-muted/10">
+          <div className="flex items-center justify-between gap-2 px-4 py-3">
+            <div className="text-sm font-medium text-foreground">Computer</div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="h-2 w-2 rounded-full bg-muted-foreground/50" />
+              Complete
+            </div>
+          </div>
+          <div className="space-y-3 px-4 pb-4">
+            <BrowserToolbar
+              status="closed"
+              currentUrl=""
+              actionLabel="Idle"
+              isLive={false}
+              displayLabel="Output ready"
+            />
+            <BrowserViewport sessionId={sessionId} enabled={false} showLive={false} />
+            <div
+              data-testid="computer-viewport-placeholder"
+              className="rounded-lg border border-dashed bg-muted/20 px-4 py-3 text-xs text-muted-foreground"
+            >
+              No page snapshots yet. Computer playback will appear automatically when tools view pages.
             </div>
           </div>
         </section>

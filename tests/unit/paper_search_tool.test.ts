@@ -92,4 +92,52 @@ describe('PaperSearchTool', () => {
     const callArg = orchestrator.mock.calls[0][0];
     expect(callArg.sortBy).toBe('relevance');
   });
+
+  it('removes task framing text before hitting paper providers', async () => {
+    const orchestrator = vi.fn().mockResolvedValue({
+      papers: [],
+      sourcesQueried: ['arxiv'],
+      sourcesSkipped: [],
+      exclusionReasons: [],
+    });
+
+    const tool = new PaperSearchTool(mockContext, { runOrchestrator: orchestrator });
+
+    await tool.execute({
+      query: 'collect top hottest 3 Timeseries ML papers published in 2026 and generate a presentation PPT for a tech talk',
+      topK: 3,
+    });
+
+    const callArg = orchestrator.mock.calls[0][0];
+    expect(callArg.query.toLowerCase()).toContain('timeseries');
+    expect(callArg.query.toLowerCase()).toContain('ml');
+    expect(callArg.query.toLowerCase()).not.toContain('generate');
+    expect(callArg.query.toLowerCase()).not.toContain('presentation');
+    expect(callArg.query.toLowerCase()).not.toContain('tech talk');
+    expect(callArg.query).not.toContain('2026');
+  });
+
+  it('classifies provider failures separately from genuine zero-results', async () => {
+    const orchestrator = vi.fn().mockResolvedValue({
+      papers: [],
+      sourcesQueried: [],
+      sourcesSkipped: ['arxiv', 'semantic_scholar'],
+      exclusionReasons: ['arxiv: API unavailable', 'semantic_scholar: timeout'],
+    });
+
+    const tool = new PaperSearchTool(mockContext, { runOrchestrator: orchestrator });
+
+    const result = await tool.execute({
+      query: 'time series forecasting in 2026',
+      topK: 3,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.warning).toContain('providers failed');
+    const artifact = result.artifacts?.[0];
+    expect(artifact).toBeTruthy();
+    const parsed = JSON.parse(String(artifact?.content));
+    expect(parsed.searchStatus).toBe('provider_error');
+    expect(parsed.zeroResults).toBe(true);
+  });
 });

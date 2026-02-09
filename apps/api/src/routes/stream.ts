@@ -96,7 +96,7 @@ const inferFocusTab = (
     return { tab: 'computer', reason: 'Presentation generation uses Computer view' };
   }
   if (goal?.requiresSearch) {
-    return { tab: 'sources', reason: 'Search results and citations' };
+    return { tab: 'computer', reason: 'Search workflows are tracked in Computer view' };
   }
   return { tab: 'reasoning', reason: 'Default reasoning trace' };
 };
@@ -361,6 +361,20 @@ async function processAgentTurn(
             },
           }),
         });
+
+        if (chunk.toolCall.name === 'web_search') {
+          await sseStream.writeSSE({
+            data: JSON.stringify({
+              type: 'inspector.focus',
+              sessionId,
+              timestamp: Date.now(),
+              data: {
+                tab: 'computer',
+                reason: 'Web search is tracked in Computer view',
+              },
+            }),
+          });
+        }
       }
       else if (chunk.type === 'done') {
         // No more chunks

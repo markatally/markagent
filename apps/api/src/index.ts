@@ -2,7 +2,6 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { secureHeaders } from 'hono/secure-headers';
-import { serve } from '@hono/node-server';
 import { createNodeWebSocket } from '@hono/node-ws';
 
 // Route imports
@@ -85,22 +84,6 @@ app.onError((err, c) => {
   });
 });
 
-// Start server only when run directly (not when imported by tests)
-const isMainModule = import.meta.main || process.argv[1]?.includes('index.ts');
-
-if (isMainModule) {
-  const port = Number(process.env.PORT) || 4000;
-
-  console.log(`Starting server on port ${port}...`);
-
-  const server = serve({
-    fetch: app.fetch,
-    port,
-  });
-
-  injectWebSocket(server);
-
-  console.log(`Server running at http://localhost:${port}`);
-}
+export { injectWebSocket };
 
 export default app;

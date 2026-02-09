@@ -100,6 +100,46 @@ export function ChatContainer({ sessionId, onOpenSkills }: ChatContainerProps) {
   }, [messages.length, streamingContent, isThinking]);
 
   const handleSSEEvent = (event: SSEEvent) => {
+    const openComputerInspector = () => {
+      setInspectorTab('computer');
+      setInspectorOpen(true);
+    };
+
+    const appendWebSearchResultSteps = (toolData: any) => {
+      const artifacts = Array.isArray(toolData?.artifacts) ? toolData.artifacts : [];
+      const searchArtifact = artifacts.find(
+        (artifact: any) =>
+          artifact?.name === 'search-results.json' && typeof artifact?.content === 'string'
+      );
+      if (!searchArtifact) return;
+
+      try {
+        const parsed = JSON.parse(searchArtifact.content) as {
+          query?: string;
+          results?: Array<{ title?: string; url?: string; content?: string }>;
+        };
+        const results = Array.isArray(parsed.results) ? parsed.results : [];
+        for (const result of results) {
+          if (!result?.url) continue;
+          appendAgentStep(sessionId, {
+            type: 'browse',
+            output: result.title || result.url,
+            snapshot: {
+              stepIndex: 0,
+              timestamp: Date.now(),
+              url: result.url,
+              metadata: {
+                actionDescription: 'Visit page',
+                domSummary: result.content,
+              },
+            },
+          });
+        }
+      } catch {
+        // Ignore malformed artifact content and continue.
+      }
+    };
+
     switch (event.type) {
       case 'message.start':
         startStreaming(sessionId);
@@ -130,6 +170,22 @@ export function ChatContainer({ sessionId, onOpenSkills }: ChatContainerProps) {
 
       case 'tool.start':
         if (event.data) {
+          if (event.data.toolName === 'web_search') {
+            openComputerInspector();
+            appendAgentStep(sessionId, {
+              type: 'search',
+              output: event.data.params?.query || event.data.parameters?.query || 'Web search',
+              snapshot: {
+                stepIndex: 0,
+                timestamp: Date.now(),
+                metadata: {
+                  actionDescription: `Search: ${
+                    event.data.params?.query || event.data.parameters?.query || ''
+                  }`.trim(),
+                },
+              },
+            });
+          }
           // Turn off thinking indicator since tool card provides visual feedback
           setThinking(false);
           startToolCall(
@@ -143,6 +199,10 @@ export function ChatContainer({ sessionId, onOpenSkills }: ChatContainerProps) {
 
       case 'tool.complete':
         if (event.data) {
+          if (event.data.toolName === 'web_search') {
+            openComputerInspector();
+            appendWebSearchResultSteps(event.data);
+          }
           const toolResult: import('@mark/shared').ToolResult = {
             success: true,
             output: event.data.result || '',
