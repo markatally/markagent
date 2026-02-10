@@ -88,6 +88,33 @@ const getLatestBrowserActionScreenshot = (
   return null;
 };
 
+function normalizeUrl(raw: string): string {
+  try {
+    const parsed = new URL(raw);
+    const keys = Array.from(parsed.searchParams.keys());
+    for (const key of keys) {
+      if (
+        /^utm_/i.test(key) ||
+        /^ga_/i.test(key) ||
+        /^gaa_/i.test(key) ||
+        /^gclid$/i.test(key) ||
+        /^fbclid$/i.test(key) ||
+        /^mc_eid$/i.test(key) ||
+        /^mc_cid$/i.test(key) ||
+        /^ref$/i.test(key) ||
+        /^ref_src$/i.test(key) ||
+        /^igshid$/i.test(key) ||
+        /^mkt_tok$/i.test(key)
+      ) {
+        parsed.searchParams.delete(key);
+      }
+    }
+    return parsed.toString();
+  } catch {
+    return raw;
+  }
+}
+
 export function ComputerPanel({ sessionId }: ComputerPanelProps) {
   const isStreaming = useChatStore((state) => state.isStreaming);
   const streamingSessionId = useChatStore((state) => state.streamingSessionId);
@@ -176,7 +203,8 @@ export function ComputerPanel({ sessionId }: ComputerPanelProps) {
   const browserCurrentIndex = browserSession?.currentActionIndex ?? 0;
   const isAtLatestAction = browserActions.length === 0 || browserCurrentIndex >= browserActions.length - 1;
   const selectedBrowserAction = browserActions[browserCurrentIndex];
-  const displayUrl = selectedBrowserAction?.url ?? browserSession?.currentUrl ?? '';
+  const displayUrlRaw = selectedBrowserAction?.url ?? browserSession?.currentUrl ?? '';
+  const displayUrl = displayUrlRaw ? normalizeUrl(displayUrlRaw) : displayUrlRaw;
   const displayTitle = isAtLatestAction ? browserSession?.currentTitle : undefined;
   const lastBrowserAction = browserActions[browserCurrentIndex];
   const actionLabel = lastBrowserAction
@@ -189,7 +217,8 @@ export function ComputerPanel({ sessionId }: ComputerPanelProps) {
   );
   const selectedAgentStep = agentSteps[agentCurrentIndex];
   const selectedSnapshotUrl = selectedAgentStep?.snapshot?.screenshot ?? null;
-  const selectedStepUrl = selectedAgentStep?.snapshot?.url ?? displayUrl;
+  const selectedStepUrlRaw = selectedAgentStep?.snapshot?.url ?? displayUrl;
+  const selectedStepUrl = selectedStepUrlRaw ? normalizeUrl(selectedStepUrlRaw) : selectedStepUrlRaw;
   const selectedStepTitle = selectedAgentStep?.snapshot?.metadata?.actionDescription;
   const isAtLatestAgentStep = agentSteps.length === 0 || agentCurrentIndex >= agentSteps.length - 1;
 
@@ -316,7 +345,8 @@ export function ComputerPanel({ sessionId }: ComputerPanelProps) {
                 ? Math.max(0, Math.min(selectedVisitIndex, browseResults.length - 1))
                 : 0;
               const selectedVisit = visitOnlyMode ? browseResults[clampedVisitIndex] : null;
-              const visitViewportUrl = selectedVisit?.url;
+              const visitViewportUrlRaw = selectedVisit?.url;
+              const visitViewportUrl = visitViewportUrlRaw ? normalizeUrl(visitViewportUrlRaw) : visitViewportUrlRaw;
               const visitViewportTitle = selectedVisit?.title;
               const visitScreenshotUrl = selectedVisit?.screenshotDataUrl ?? null;
               const viewportUrl = hasTimeline ? selectedStepUrl : displayUrl;
@@ -475,7 +505,7 @@ export function ComputerPanel({ sessionId }: ComputerPanelProps) {
                               )}
                             >
                               <a
-                                href={visit.url}
+                                href={visit.url ? normalizeUrl(visit.url) : visit.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="truncate font-medium text-foreground underline decoration-muted-foreground/50 underline-offset-2 hover:decoration-foreground"

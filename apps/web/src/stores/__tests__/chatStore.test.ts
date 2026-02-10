@@ -266,6 +266,41 @@ describe('chatStore', () => {
       const state = useChatStore.getState();
       expect(state.toolCalls.size).toBe(0);
     });
+
+    it('should upsert a tool call (hydrate persisted)', () => {
+      const { upsertToolCall } = useChatStore.getState();
+
+      upsertToolCall({
+        sessionId: 'session-1',
+        messageId: 'msg-1',
+        toolCallId: 'tool-1',
+        toolName: 'web_search',
+        params: { query: 'test' },
+        status: 'completed',
+        result: { success: true, output: 'ok', duration: 12 },
+      });
+
+      let state = useChatStore.getState();
+      expect(state.toolCalls.get('tool-1')?.status).toBe('completed');
+      expect(state.toolCalls.get('tool-1')?.messageId).toBe('msg-1');
+      expect(state.toolCalls.get('tool-1')?.result?.output).toBe('ok');
+
+      // Update same tool call id should merge/override fields
+      upsertToolCall({
+        sessionId: 'session-1',
+        messageId: 'msg-1',
+        toolCallId: 'tool-1',
+        toolName: 'web_search',
+        params: { query: 'test2' },
+        status: 'failed',
+        error: 'boom',
+      });
+
+      state = useChatStore.getState();
+      expect(state.toolCalls.get('tool-1')?.status).toBe('failed');
+      expect(state.toolCalls.get('tool-1')?.params?.query).toBe('test2');
+      expect(state.toolCalls.get('tool-1')?.error).toBe('boom');
+    });
   });
 
   describe('clearMessages', () => {

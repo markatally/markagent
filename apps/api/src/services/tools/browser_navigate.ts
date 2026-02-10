@@ -1,5 +1,6 @@
 import type { Tool, ToolResult, ToolContext } from './types';
 import { getBrowserManager } from '../browser/manager';
+import { normalizeWebSearchUrl } from '../browser/orchestrator';
 
 /**
  * Browser Navigate Tool
@@ -27,7 +28,8 @@ export class BrowserNavigateTool implements Tool {
 
   async execute(params: Record<string, unknown>): Promise<ToolResult> {
     const startTime = Date.now();
-    const url = String(params.url ?? '').trim();
+    const urlRaw = String(params.url ?? '').trim();
+    const url = normalizeWebSearchUrl(urlRaw);
     if (!url) {
       return {
         success: false,

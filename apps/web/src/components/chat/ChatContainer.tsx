@@ -100,6 +100,34 @@ export function ChatContainer({ sessionId, onOpenSkills }: ChatContainerProps) {
   }, [messages.length, streamingContent, isThinking]);
 
   const handleSSEEvent = (event: SSEEvent) => {
+    const normalizeUrl = (raw: string | undefined | null) => {
+      if (!raw) return raw ?? '';
+      try {
+        const parsed = new URL(raw);
+        const keys = Array.from(parsed.searchParams.keys());
+        for (const key of keys) {
+          if (
+            /^utm_/i.test(key) ||
+            /^ga_/i.test(key) ||
+            /^gaa_/i.test(key) ||
+            /^gclid$/i.test(key) ||
+            /^fbclid$/i.test(key) ||
+            /^mc_eid$/i.test(key) ||
+            /^mc_cid$/i.test(key) ||
+            /^ref$/i.test(key) ||
+            /^ref_src$/i.test(key) ||
+            /^igshid$/i.test(key) ||
+            /^mkt_tok$/i.test(key)
+          ) {
+            parsed.searchParams.delete(key);
+          }
+        }
+        return parsed.toString();
+      } catch {
+        return raw;
+      }
+    };
+
     const openComputerInspector = () => {
       setInspectorTab('computer');
       setInspectorOpen(true);
@@ -314,7 +342,10 @@ export function ChatContainer({ sessionId, onOpenSkills }: ChatContainerProps) {
 
       case 'browse.activity':
         if (event.data?.action) {
-          addBrowseActivity(sessionId, event.data);
+          addBrowseActivity(sessionId, {
+            ...event.data,
+            ...(event.data?.url ? { url: normalizeUrl(event.data.url) } : {}),
+          });
           const action = event.data.action as 'search' | 'visit' | 'read';
           appendAgentStep(sessionId, {
             type: action === 'search' ? 'search' : 'browse',
@@ -326,7 +357,7 @@ export function ChatContainer({ sessionId, onOpenSkills }: ChatContainerProps) {
               stepIndex: 0,
               timestamp:
                 typeof event.data.timestamp === 'number' ? event.data.timestamp : Date.now(),
-              url: event.data.url,
+              url: normalizeUrl(event.data.url),
               metadata: {
                 actionDescription:
                   action === 'search'
@@ -385,13 +416,16 @@ export function ChatContainer({ sessionId, onOpenSkills }: ChatContainerProps) {
             | 'wait'
             | 'extract'
             | 'screenshot';
-          const actionUrl =
-            event.data.params?.url ||
-            useChatStore.getState().browserSession.get(sessionId)?.currentUrl;
+          const actionUrl = normalizeUrl(
+            event.data.loadedUrl ||
+              event.data.normalizedUrl ||
+              event.data.params?.url ||
+              useChatStore.getState().browserSession.get(sessionId)?.currentUrl
+          );
           addBrowserAction(sessionId, {
             id: `browser-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             type: actionType,
-            url: event.data.params?.url,
+            url: actionUrl,
             selector: event.data.params?.selector,
             text: event.data.params?.text,
             timestamp: Date.now(),

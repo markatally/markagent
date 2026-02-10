@@ -388,11 +388,14 @@ export function createBrowserObservableExecutor(
               sessionId,
               data: {
                 action: 'browser_navigate',
-                params: { url: entry.url },
+                // Use normalized URL for stability (many sites include expiring tracking query params).
+                // Keep the original in the payload for debugging.
+                params: { url: entry.normalizedUrl },
                 success: navigation.ok,
                 output: outputByMode,
                 error: navigationError,
                 mode: navigation.mode,
+                originalUrl: entry.url,
                 normalizedUrl: entry.normalizedUrl,
                 loadedUrl: navigation.loadedUrl,
               },

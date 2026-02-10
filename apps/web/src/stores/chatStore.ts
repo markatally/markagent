@@ -111,12 +111,14 @@ const EXECUTION_MODE_STORAGE_KEY = 'execution-mode';
 const COMPUTER_STATE_PREFIX = 'mark-agent-computer-';
 
 const getInitialSidebarOpen = () => {
+  if (typeof localStorage === 'undefined') return true;
   const stored = localStorage.getItem(SIDEBAR_OPEN_STORAGE_KEY);
   if (stored === null) return true;
   return stored === 'true';
 };
 
 const getInitialExecutionMode = (): ExecutionMode => {
+  if (typeof localStorage === 'undefined') return 'direct';
   const stored = localStorage.getItem(EXECUTION_MODE_STORAGE_KEY);
   return stored === 'sandbox' ? 'sandbox' : 'direct';
 };
@@ -183,6 +185,8 @@ interface ChatState {
 
   // Actions - Tool calls
   startToolCall: (sessionId: string, toolCallId: string, toolName: string, params: any) => void;
+  /** Atomic upsert used when hydrating persisted tool calls on page load/refresh. */
+  upsertToolCall: (toolCall: ToolCallStatus) => void;
   updateToolCall: (toolCallId: string, updates: Partial<ToolCallStatus>) => void;
   updateToolCallProgress: (toolCallId: string, current: number, total: number, message?: string) => void;
   completeToolCall: (toolCallId: string, result: ToolResult) => void;
@@ -255,6 +259,7 @@ interface ChatState {
 
 function persistComputerState(get: () => ChatState, sessionId: string) {
   try {
+    if (typeof localStorage === 'undefined') return;
     const state = get();
     const data = {
       browserSession: state.browserSession.get(sessionId) ?? null,
@@ -396,6 +401,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
         params,
         status: 'running',
       });
+      return { toolCalls: newToolCalls };
+    });
+  },
+
+  // Upsert a tool call (used for persisted hydration and safe refresh behavior)
+  upsertToolCall: (toolCall: ToolCallStatus) => {
+    set((state) => {
+      const newToolCalls = new Map(state.toolCalls);
+      const existing = newToolCalls.get(toolCall.toolCallId);
+      newToolCalls.set(
+        toolCall.toolCallId,
+        existing ? { ...existing, ...toolCall } : toolCall
+      );
       return { toolCalls: newToolCalls };
     });
   },
@@ -623,7 +641,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   setSidebarOpen: (open: boolean) => {
-    localStorage.setItem(SIDEBAR_OPEN_STORAGE_KEY, String(open));
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(SIDEBAR_OPEN_STORAGE_KEY, String(open));
+      }
+    } catch (_) {
+      /* ignore */
+    }
     set({ sidebarOpen: open });
   },
 
@@ -632,7 +656,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   setExecutionMode: (mode: ExecutionMode) => {
-    localStorage.setItem(EXECUTION_MODE_STORAGE_KEY, mode);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(EXECUTION_MODE_STORAGE_KEY, mode);
+      }
+    } catch (_) {
+      /* ignore */
+    }
     set({ executionMode: mode });
   },
 
@@ -978,6 +1008,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   loadComputerStateFromStorage: (sessionId: string) => {
     try {
+      if (typeof localStorage === 'undefined') return;
       const raw = localStorage.getItem(COMPUTER_STATE_PREFIX + sessionId);
       if (!raw) return;
       const data = JSON.parse(raw) as {

@@ -41,16 +41,17 @@ vi.mock('../../stores/authStore', () => ({
 }));
 
 // Mock chat store
-vi.mock('../../stores/chatStore', () => {
-  const chatState = {
-    messages: [],
-    toolCalls: new Map(),
-    setMessages: vi.fn(),
-    addMessage: vi.fn(),
-    updateMessage: vi.fn(),
-    startToolCall: vi.fn(),
-    updateToolCall: vi.fn(),
-  };
+  vi.mock('../../stores/chatStore', () => {
+    const chatState = {
+      messages: [],
+      toolCalls: new Map(),
+      setMessages: vi.fn(),
+      addMessage: vi.fn(),
+      updateMessage: vi.fn(),
+      startToolCall: vi.fn(),
+      upsertToolCall: vi.fn(),
+      updateToolCall: vi.fn(),
+    };
 
   const useChatStore = vi.fn((selector?: (state: typeof chatState) => any) =>
     selector ? selector(chatState) : chatState

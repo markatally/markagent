@@ -4,6 +4,7 @@
  */
 
 import type { Tool, ToolContext, ToolResult } from './types';
+import { normalizeWebSearchUrl } from '../browser/orchestrator';
 
 type SearchTopic = 'general' | 'news';
 type SearchDepth = 'basic' | 'advanced';
@@ -190,7 +191,7 @@ export class WebSearchTool implements Tool {
     const results = Array.isArray(data?.results) ? data.results : [];
     return results.map((item: any) => ({
       title: String(item.title ?? ''),
-      url: String(item.url ?? ''),
+      url: normalizeWebSearchUrl(String(item.url ?? '')),
       content: input.includeContent ? String(item.content ?? '') : undefined,
       score: typeof item.score === 'number' ? item.score : undefined,
       publishedDate: item.published_date ? String(item.published_date) : undefined,
@@ -233,7 +234,7 @@ export class WebSearchTool implements Tool {
 
     return results.map((item: any) => ({
       title: String(item.title ?? ''),
-      url: String(item.url ?? ''),
+      url: normalizeWebSearchUrl(String(item.url ?? '')),
       content: input.includeContent
         ? String(item.description ?? item.snippet ?? item.extra_snippets?.[0] ?? '')
         : undefined,
