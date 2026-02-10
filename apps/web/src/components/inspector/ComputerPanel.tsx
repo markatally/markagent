@@ -89,6 +89,8 @@ const getLatestBrowserActionScreenshot = (
 };
 
 export function ComputerPanel({ sessionId }: ComputerPanelProps) {
+  const isStreaming = useChatStore((state) => state.isStreaming);
+  const streamingSessionId = useChatStore((state) => state.streamingSessionId);
   const terminalLines = useChatStore((state) => state.terminalLines.get(sessionId) || []);
   const executionSteps = useChatStore((state) => state.executionSteps.get(sessionId) || []);
   const sandboxFiles = useChatStore((state) => state.sandboxFiles.get(sessionId) || []);
@@ -100,6 +102,7 @@ export function ComputerPanel({ sessionId }: ComputerPanelProps) {
   const setBrowserActionIndex = useChatStore((state) => state.setBrowserActionIndex);
   const agentTimeline = useChatStore((state) => state.agentSteps.get(sessionId));
   const setAgentStepIndex = useChatStore((state) => state.setAgentStepIndex);
+  const isSessionStreaming = isStreaming && streamingSessionId === sessionId;
 
   const [followOutput, setFollowOutput] = useState(true);
   const [selectedVisitIndex, setSelectedVisitIndex] = useState(0);
@@ -197,7 +200,7 @@ export function ComputerPanel({ sessionId }: ComputerPanelProps) {
     const replayIndex = hasAgentTimeline ? agentCurrentIndex : browserCurrentIndex;
     const replayTotal = hasAgentTimeline ? agentSteps.length : browserActions.length;
     const replayLive =
-      isBrowserMode && (hasAgentTimeline ? isAtLatestAgentStep : isAtLatestAction);
+      isSessionStreaming && isBrowserMode && (hasAgentTimeline ? isAtLatestAgentStep : isAtLatestAction);
     const replaySnapshot = hasAgentTimeline
       ? selectedSnapshotUrl ??
         getNearestTimelineScreenshot(agentSteps, agentCurrentIndex) ??
@@ -205,33 +208,37 @@ export function ComputerPanel({ sessionId }: ComputerPanelProps) {
       : browserActions[browserCurrentIndex]?.screenshotDataUrl ??
         getLatestBrowserActionScreenshot(browserActions);
     return (
-      <div className="space-y-4">
-        <section className="rounded-xl border bg-muted/10">
+      <div className="flex h-full min-h-0 flex-1 flex-col">
+        <section className="flex min-h-0 flex-1 flex-col rounded-xl border bg-muted/10">
           <div className="flex items-center justify-between gap-2 px-4 py-3">
             <div className="text-sm font-medium text-foreground">Computer</div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span
                 className={cn(
                   'h-2 w-2 rounded-full',
-                  replayLive ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground/50'
+                  replayLive ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'
                 )}
               />
-              {replayLive ? 'Live' : 'Complete'}
+              {replayLive ? 'Live' : 'Completed'}
             </div>
           </div>
-          <div className="space-y-3 px-4 pb-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4">
             <BrowserToolbar
               status={browserSession?.status ?? (isBrowserMode ? 'active' : 'closed')}
               currentUrl={selectedStepUrl}
               currentTitle={selectedStepTitle ?? displayTitle ?? browserSession?.currentTitle}
               actionLabel={selectedStepTitle ?? actionLabel}
               isLive={replayLive}
+              showLiveIndicator={false}
             />
             <BrowserViewport
               sessionId={sessionId}
               enabled={isBrowserMode}
               snapshotUrl={replaySnapshot}
               showLive={replayLive}
+              fillHeight
+              minHeight={0}
+              className="flex-1 min-h-0"
             />
             <TimelineScrubber
               currentIndex={replayIndex}
@@ -257,6 +264,7 @@ export function ComputerPanel({ sessionId }: ComputerPanelProps) {
                   ? setAgentStepIndex(sessionId, index)
                   : setBrowserActionIndex(sessionId, index)
               }
+              showLiveIndicator={false}
               showBackForwardLabels
               stepLabel="Step"
             />
@@ -279,7 +287,7 @@ export function ComputerPanel({ sessionId }: ComputerPanelProps) {
       0,
       pptPipeline.steps.findIndex((step) => step.id === currentPipelineStep)
     );
-    const isLive = currentStepStatus === 'running';
+    const isLive = isSessionStreaming && currentStepStatus === 'running';
 
     return (
       <div className="flex min-h-0 flex-1 flex-col">
@@ -287,8 +295,8 @@ export function ComputerPanel({ sessionId }: ComputerPanelProps) {
           <div className="flex shrink-0 items-center justify-between gap-2 px-4 py-3">
             <div className="text-sm font-medium text-foreground">Computer</div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className={cn('h-2 w-2 rounded-full', isLive ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground/50')} />
-              {isLive ? 'Live' : 'Complete'}
+              <span className={cn('h-2 w-2 rounded-full', isLive ? 'bg-red-500 animate-pulse' : 'bg-emerald-500')} />
+              {isLive ? 'Live' : 'Completed'}
             </div>
           </div>
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4">
@@ -324,7 +332,7 @@ export function ComputerPanel({ sessionId }: ComputerPanelProps) {
                 : browserActions[browserCurrentIndex]?.screenshotDataUrl ?? null;
               const timelineIndex = hasTimeline ? agentCurrentIndex : browserCurrentIndex;
               const timelineTotal = hasTimeline ? agentSteps.length : browserActions.length;
-              const timelineIsLive = hasTimeline ? isAtLatestAgentStep : isAtLatestAction;
+              const timelineIsLive = isSessionStreaming && (hasTimeline ? isAtLatestAgentStep : isAtLatestAction);
               return (
                 <>
                   <BrowserToolbar
@@ -337,6 +345,7 @@ export function ComputerPanel({ sessionId }: ComputerPanelProps) {
                     }
                     actionLabel={selectedStepTitle ?? actionLabel}
                     isLive={timelineIsLive}
+                    showLiveIndicator={false}
                     displayLabel={hasBrowser ? undefined : activityLabel}
                   />
                   {hasBrowser ? (
@@ -346,6 +355,9 @@ export function ComputerPanel({ sessionId }: ComputerPanelProps) {
                         enabled={isBrowserMode}
                         snapshotUrl={viewportSnapshot}
                         showLive={isLive && timelineIsLive}
+                        fillHeight
+                        minHeight={0}
+                        className="flex-1 min-h-0"
                       />
                       {timelineTotal > 0 && (
                         <TimelineScrubber
@@ -372,6 +384,7 @@ export function ComputerPanel({ sessionId }: ComputerPanelProps) {
                               ? setAgentStepIndex(sessionId, index)
                               : setBrowserActionIndex(sessionId, index)
                           }
+                          showLiveIndicator={false}
                           showBackForwardLabels
                           stepLabel="Step"
                         />
@@ -393,6 +406,9 @@ export function ComputerPanel({ sessionId }: ComputerPanelProps) {
                           enabled={false}
                           snapshotUrl={visitScreenshotUrl}
                           showLive={false}
+                          fillHeight
+                          minHeight={0}
+                          className="flex-1 min-h-0"
                         />
                       ) : (
                         <div
@@ -532,8 +548,8 @@ export function ComputerPanel({ sessionId }: ComputerPanelProps) {
           <div className="flex items-center justify-between gap-2 px-4 py-3">
             <div className="text-sm font-medium text-foreground">Computer</div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="h-2 w-2 rounded-full bg-muted-foreground/50" />
-              Complete
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Completed
             </div>
           </div>
           <div className="space-y-3 px-4 pb-4">

@@ -13,6 +13,8 @@ const MIN_INSPECTOR_WIDTH = 280;
 const MAX_INSPECTOR_WIDTH = 560;
 const DEFAULT_INSPECTOR_WIDTH = 320;
 const STORAGE_KEY = 'inspector-width';
+const clampInspectorWidth = (value: number) =>
+  Math.min(Math.max(value, MIN_INSPECTOR_WIDTH), MAX_INSPECTOR_WIDTH);
 
 interface InspectorPanelProps {
   open: boolean;
@@ -28,7 +30,7 @@ export function InspectorPanel({ open, sessionId, onClose }: InspectorPanelProps
   const [width, setWidth] = useState(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     return stored
-      ? Math.min(Math.max(parseInt(stored, 10), MIN_INSPECTOR_WIDTH), MAX_INSPECTOR_WIDTH)
+      ? clampInspectorWidth(parseInt(stored, 10))
       : DEFAULT_INSPECTOR_WIDTH;
   });
   const [isResizing, setIsResizing] = useState(false);
@@ -45,10 +47,7 @@ export function InspectorPanel({ open, sessionId, onClose }: InspectorPanelProps
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
       if (!isResizing) return;
-      const newWidth = window.innerWidth - e.clientX;
-      if (newWidth >= MIN_INSPECTOR_WIDTH && newWidth <= MAX_INSPECTOR_WIDTH) {
-        setWidth(newWidth);
-      }
+      setWidth(clampInspectorWidth(window.innerWidth - e.clientX));
     },
     [isResizing]
   );
@@ -134,8 +133,12 @@ export function InspectorPanel({ open, sessionId, onClose }: InspectorPanelProps
                   </TabsList>
                 </div>
 
-                <div className="flex-1 min-w-0 overflow-y-auto p-3">
-                  <TabsContent value="tools" className="min-w-0 space-y-3">
+                <div className="relative flex-1 min-w-0 overflow-hidden">
+                  <TabsContent
+                    value="tools"
+                    forceMount
+                    className="absolute inset-0 m-0 min-w-0 overflow-y-auto p-3 data-[state=inactive]:hidden"
+                  >
                     {sessionToolCalls.length > 0 ? (
                       <div className="min-w-0 rounded-xl border bg-muted/10">
                         <div className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left">
@@ -160,15 +163,27 @@ export function InspectorPanel({ open, sessionId, onClose }: InspectorPanelProps
                     )}
                   </TabsContent>
 
-                  <TabsContent value="sources" className="min-w-0">
+                  <TabsContent
+                    value="sources"
+                    forceMount
+                    className="absolute inset-0 m-0 min-w-0 overflow-y-auto p-3 data-[state=inactive]:hidden"
+                  >
                     <SourcesList sessionId={sessionId} selectedMessageId={selectedMessageId} />
                   </TabsContent>
 
-                  <TabsContent value="reasoning" className="min-w-0">
+                  <TabsContent
+                    value="reasoning"
+                    forceMount
+                    className="absolute inset-0 m-0 min-w-0 overflow-y-auto p-3 data-[state=inactive]:hidden"
+                  >
                     <ReasoningTrace sessionId={sessionId} selectedMessageId={selectedMessageId} />
                   </TabsContent>
 
-                  <TabsContent value="computer" className="flex h-full min-h-0 min-w-0 flex-col">
+                  <TabsContent
+                    value="computer"
+                    forceMount
+                    className="absolute inset-0 m-0 flex h-full min-h-0 min-w-0 flex-col overflow-hidden px-3 pt-3 pb-0 data-[state=inactive]:hidden"
+                  >
                     <ComputerPanel sessionId={sessionId} />
                   </TabsContent>
                 </div>

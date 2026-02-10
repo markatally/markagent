@@ -10,12 +10,22 @@ interface ReasoningTraceProps {
 export function ReasoningTrace({ sessionId, selectedMessageId }: ReasoningTraceProps) {
   const isStreaming = useChatStore((state) => state.isStreaming);
   const streamingSessionId = useChatStore((state) => state.streamingSessionId);
+  const messages = useChatStore((state) => state.messages.get(sessionId) || []);
+  const reasoningMap = useChatStore((state) => state.reasoningSteps);
   const isActive = isStreaming && streamingSessionId === sessionId;
 
-  // Determine which key to use for reasoning steps
-  // If a message is selected, use message-specific key; otherwise use session key
-  const reasoningKey = selectedMessageId ? `msg-${selectedMessageId}` : sessionId;
-  const reasoningSteps = useChatStore((state) => state.reasoningSteps.get(reasoningKey) || []);
+  const selectedMessageKey = selectedMessageId ? `msg-${selectedMessageId}` : null;
+  const latestAssistantMessageWithTrace = [...messages]
+    .reverse()
+    .find((message) => message.role === 'assistant' && (reasoningMap.get(`msg-${message.id}`)?.length ?? 0) > 0);
+  const fallbackMessageKey = latestAssistantMessageWithTrace ? `msg-${latestAssistantMessageWithTrace.id}` : null;
+  const sessionReasoningSteps = reasoningMap.get(sessionId) || [];
+  const reasoningKey = selectedMessageKey
+    ? selectedMessageKey
+    : sessionReasoningSteps.length > 0
+      ? sessionId
+      : fallbackMessageKey ?? sessionId;
+  const reasoningSteps = reasoningMap.get(reasoningKey) || [];
 
   if (reasoningSteps.length === 0) {
     return (

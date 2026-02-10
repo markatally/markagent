@@ -7,6 +7,7 @@ interface BrowserToolbarProps {
   currentTitle?: string;
   actionLabel?: string;
   isLive?: boolean;
+  showLiveIndicator?: boolean;
   className?: string;
   /** When set (e.g. PPT search mode), show this instead of "Agent is using Browser" */
   displayLabel?: string;
@@ -31,6 +32,7 @@ export function BrowserToolbar({
   currentTitle,
   actionLabel,
   isLive = true,
+  showLiveIndicator = true,
   className,
   displayLabel,
 }: BrowserToolbarProps) {
@@ -43,9 +45,9 @@ export function BrowserToolbar({
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <span className="font-medium text-foreground">{titleLabel}</span>
         <span>{statusText}</span>
-        {isLive && status === 'active' && (
+        {showLiveIndicator && isLive && status === 'active' && (
           <span className="flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
             Live
           </span>
         )}

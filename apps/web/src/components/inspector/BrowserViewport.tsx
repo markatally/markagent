@@ -10,6 +10,9 @@ interface BrowserViewportProps {
   snapshotUrl?: string | null;
   /** When false, show stored snapshot instead of live WebSocket frame (e.g. when scrubbing history) */
   showLive?: boolean;
+  /** When true, fill parent height and use minHeight instead of fixed 16:9 aspect ratio */
+  fillHeight?: boolean;
+  minHeight?: number;
   className?: string;
 }
 
@@ -17,10 +20,21 @@ interface BrowserViewportProps {
  * Renders live browser screencast frames on a canvas.
  * Connects to WebSocket and draws JPEG frames as they arrive.
  */
-export function BrowserViewport({ sessionId, enabled, snapshotUrl, showLive = true, className }: BrowserViewportProps) {
+export function BrowserViewport({
+  sessionId,
+  enabled,
+  snapshotUrl,
+  showLive = true,
+  fillHeight = false,
+  minHeight = 320,
+  className,
+}: BrowserViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { frameDataUrl, status, error } = useBrowserStream(sessionId, enabled);
   const displayLive = showLive !== false && !!frameDataUrl;
+  const viewportStyle = fillHeight
+    ? ({ minHeight } as const)
+    : ({ aspectRatio: ASPECT_RATIO } as const);
 
   useEffect(() => {
     if (!frameDataUrl || !canvasRef.current) return;
@@ -62,7 +76,7 @@ export function BrowserViewport({ sessionId, enabled, snapshotUrl, showLive = tr
           'flex items-center justify-center rounded-lg border bg-muted/20 text-sm text-muted-foreground',
           className
         )}
-        style={{ aspectRatio: ASPECT_RATIO }}
+        style={viewportStyle}
       >
         Browser view is off
       </div>
@@ -76,7 +90,7 @@ export function BrowserViewport({ sessionId, enabled, snapshotUrl, showLive = tr
           'flex items-center justify-center rounded-lg border bg-muted/20 text-sm text-muted-foreground',
           className
         )}
-        style={{ aspectRatio: ASPECT_RATIO }}
+        style={viewportStyle}
       >
         Connecting...
       </div>
@@ -90,7 +104,7 @@ export function BrowserViewport({ sessionId, enabled, snapshotUrl, showLive = tr
           'flex items-center justify-center rounded-lg border border-destructive/30 bg-destructive/5 text-sm text-destructive',
           className
         )}
-        style={{ aspectRatio: ASPECT_RATIO }}
+        style={viewportStyle}
       >
         {error ?? 'Connection failed'}
       </div>
@@ -104,7 +118,7 @@ export function BrowserViewport({ sessionId, enabled, snapshotUrl, showLive = tr
           'flex items-center justify-center rounded-lg border bg-muted/20 text-sm text-muted-foreground',
           className
         )}
-        style={{ aspectRatio: ASPECT_RATIO }}
+        style={viewportStyle}
       >
         No browser session
       </div>
@@ -114,13 +128,13 @@ export function BrowserViewport({ sessionId, enabled, snapshotUrl, showLive = tr
   return (
     <div
       data-testid="browser-viewport"
-      className={cn('overflow-hidden rounded-lg border bg-black', className)}
-      style={{ aspectRatio: ASPECT_RATIO }}
+      className={cn('overflow-hidden rounded-lg border bg-black', fillHeight && 'min-h-0 flex-1', className)}
+      style={viewportStyle}
     >
       {displayLive ? (
         <canvas
           ref={canvasRef}
-          className="h-full w-full object-contain"
+          className="h-full max-h-full w-full object-contain"
           style={{ width: '100%', height: '100%' }}
         />
       ) : snapshotUrl ? (
@@ -128,12 +142,12 @@ export function BrowserViewport({ sessionId, enabled, snapshotUrl, showLive = tr
           data-testid="browser-viewport-screenshot"
           src={snapshotUrl}
           alt="Browser screenshot"
-          className="h-full w-full object-contain"
+          className="h-full max-h-full w-full object-contain"
         />
       ) : frameDataUrl ? (
         <canvas
           ref={canvasRef}
-          className="h-full w-full object-contain"
+          className="h-full max-h-full w-full object-contain"
           style={{ width: '100%', height: '100%' }}
         />
       ) : null}

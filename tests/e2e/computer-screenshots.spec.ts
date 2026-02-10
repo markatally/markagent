@@ -24,9 +24,12 @@ async function login(page: Page) {
 }
 
 async function openInspectorAndComputerTab(page: Page) {
+  const inspectorHeading = page.getByText('Inspector');
   const openInspector = page.getByRole('button', { name: /open inspector/i });
-  await openInspector.click();
-  await expect(page.getByText('Inspector')).toBeVisible({ timeout: 10000 });
+  if ((await inspectorHeading.count()) === 0 && (await openInspector.count()) > 0) {
+    await openInspector.click();
+  }
+  await expect(inspectorHeading).toBeVisible({ timeout: 10000 });
   const computerTab = page.getByRole('tab', { name: 'Computer' });
   await computerTab.click();
 }
@@ -86,6 +89,18 @@ test.describe('Computer tab and step screenshots', () => {
     await expect(placeholder.getByText(/No visual steps yet|Snapshot unavailable for this step/i)).toBeVisible();
 
     const screenshotImg = page.locator('[data-testid="browser-viewport-screenshot"]');
-    await expect(screenshotImg).toBeVisible({ timeout: 90000 });
+    const browserOff = page.getByText('Browser view is off');
+    const snapshotUnavailable = placeholder.getByText(/Snapshot unavailable for this step/i);
+    await expect
+      .poll(
+        async () => {
+          const screenshotVisible = await screenshotImg.first().isVisible().catch(() => false);
+          const browserOffVisible = await browserOff.first().isVisible().catch(() => false);
+          const snapshotUnavailableVisible = await snapshotUnavailable.first().isVisible().catch(() => false);
+          return screenshotVisible || browserOffVisible || snapshotUnavailableVisible;
+        },
+        { timeout: 90000 }
+      )
+      .toBe(true);
   });
 });

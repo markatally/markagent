@@ -6,6 +6,7 @@ interface TimelineScrubberProps {
   currentIndex: number;
   totalSteps: number;
   isLive: boolean;
+  showLiveIndicator?: boolean;
   onPrevious: () => void;
   onNext: () => void;
   onJumpToLive: () => void;
@@ -24,6 +25,7 @@ export function TimelineScrubber({
   currentIndex,
   totalSteps,
   isLive,
+  showLiveIndicator = true,
   onPrevious,
   onNext,
   onJumpToLive,
@@ -48,9 +50,9 @@ export function TimelineScrubber({
             Jump to live
           </Button>
         )}
-        {isLive && (
+        {showLiveIndicator && isLive && (
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
             live
           </span>
         )}
