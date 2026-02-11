@@ -42,6 +42,42 @@ export type WebSearchNavigationAttempt = {
   reason: 'direct' | 'reader';
 };
 
+export type WebFetchFailureClass =
+  | 'none'
+  | 'http_4xx'
+  | 'http_5xx'
+  | 'rate_limited'
+  | 'challenge_wall'
+  | 'timeout'
+  | 'dns'
+  | 'tls'
+  | 'network'
+  | 'unknown';
+
+export type WebSearchAttemptDiagnostic = {
+  target: string;
+  reason: 'direct' | 'reader';
+  startedAt: number;
+  finishedAt: number;
+  durationMs: number;
+  success: boolean;
+  statusCode?: number;
+  loadedUrl?: string;
+  title?: string;
+  failureClass: WebFetchFailureClass;
+  message?: string;
+};
+
+export type DomainNavigationPolicy = {
+  name: string;
+  navTimeoutMs: number;
+  settleDelayMs: number;
+  maxAttempts: number;
+  baseBackoffMs: number;
+  challengeBackoffMs: number;
+  rateLimitBackoffMs: number;
+};
+
 type WebSearchNavigationOutcome = {
   ok: boolean;
   displayUrl: string;
@@ -49,6 +85,12 @@ type WebSearchNavigationOutcome = {
   title?: string;
   mode: 'direct' | 'reader' | 'fallback';
   errors: string[];
+  diagnostics: {
+    attempts: WebSearchAttemptDiagnostic[];
+    finalFailureClass: WebFetchFailureClass;
+    policyName: string;
+    hostname?: string;
+  };
 };
 
 const HUMAN_VERIFICATION_TEXT_MARKERS = [
@@ -59,7 +101,60 @@ const HUMAN_VERIFICATION_TEXT_MARKERS = [
   'cf-challenge',
   'captcha',
   'enable javascript and cookies',
+  'enable javascript and cookies to continue',
+  '403 forbidden',
+  '401 unauthorized',
+  'request forbidden',
+  'access denied',
+  'please enable javascript',
+  'unusual traffic from your computer network',
+  'temporarily blocked',
 ];
+
+const DEFAULT_DOMAIN_POLICY: DomainNavigationPolicy = {
+  name: 'default',
+  navTimeoutMs: 15000,
+  settleDelayMs: 900,
+  maxAttempts: 2,
+  baseBackoffMs: 180,
+  challengeBackoffMs: 120,
+  rateLimitBackoffMs: 360,
+};
+
+const DOMAIN_POLICY_RULES: Array<{
+  name: string;
+  matches: (hostname: string) => boolean;
+  overrides: Partial<DomainNavigationPolicy>;
+}> = [
+  {
+    name: 'wsj',
+    matches: (hostname) => hostname.endsWith('wsj.com'),
+    overrides: { navTimeoutMs: 18000, settleDelayMs: 1200, maxAttempts: 2, rateLimitBackoffMs: 700 },
+  },
+  {
+    name: 'cnbc',
+    matches: (hostname) => hostname.endsWith('cnbc.com'),
+    overrides: { navTimeoutMs: 17000, settleDelayMs: 1100, maxAttempts: 2, rateLimitBackoffMs: 650 },
+  },
+  {
+    name: 'mediapost',
+    matches: (hostname) => hostname.endsWith('mediapost.com'),
+    overrides: { navTimeoutMs: 16000, settleDelayMs: 1000, maxAttempts: 2 },
+  },
+  {
+    name: 'reuters',
+    matches: (hostname) => hostname.endsWith('reuters.com'),
+    overrides: { navTimeoutMs: 16000, settleDelayMs: 900, maxAttempts: 2 },
+  },
+];
+
+type DomainAttemptMemory = {
+  success: number;
+  failure: number;
+  lastFailureClass?: WebFetchFailureClass;
+};
+
+const DOMAIN_ATTEMPT_MEMORY = new Map<string, DomainAttemptMemory>();
 
 function shouldDropQueryParam(name: string): boolean {
   return TRACKING_QUERY_PARAM_PATTERNS.some((pattern) => pattern.test(name));
@@ -67,7 +162,9 @@ function shouldDropQueryParam(name: string): boolean {
 
 export function normalizeWebSearchUrl(rawUrl: string): string {
   try {
-    const parsed = new URL(rawUrl);
+    const parsedInput = new URL(rawUrl);
+    const unwrapped = unwrapProxyLikeUrl(parsedInput.toString());
+    const parsed = new URL(unwrapped);
     const keys = Array.from(parsed.searchParams.keys());
     for (const key of keys) {
       if (shouldDropQueryParam(key)) {
@@ -97,16 +194,96 @@ export function buildWebSearchNavigationAttempts(rawUrl: string): WebSearchNavig
   try {
     const parsed = new URL(normalizedUrl);
     if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-      // Reader fallback often bypasses anti-bot walls enough to return text-rendered content.
-      if (!parsed.hostname.endsWith('r.jina.ai')) {
-        pushAttempt(`https://r.jina.ai/${parsed.toString()}`, 'reader');
+      // No public proxies. Keep first-party attempts only.
+      // Hostname aliases can unblock site routing edge cases.
+      if (parsed.hostname.startsWith('www.')) {
+        const withoutWww = new URL(parsed.toString());
+        withoutWww.hostname = parsed.hostname.replace(/^www\./, '');
+        pushAttempt(withoutWww.toString(), 'direct');
+      } else if (!parsed.hostname.startsWith('m.')) {
+        const withWww = new URL(parsed.toString());
+        withWww.hostname = `www.${parsed.hostname}`;
+        pushAttempt(withWww.toString(), 'direct');
       }
     }
   } catch {
     // ignore malformed URL and keep direct attempt only
   }
 
+  // Adaptive ordering: prefer targets with stronger recent success history.
+  attempts.sort((a, b) => getAttemptScore(b.target) - getAttemptScore(a.target));
+
   return attempts;
+}
+
+function getAttemptScore(target: string): number {
+  const host = extractHostname(target);
+  if (!host) return 0;
+  const mem = DOMAIN_ATTEMPT_MEMORY.get(host);
+  if (!mem) return 0;
+  return mem.success * 2 - mem.failure;
+}
+
+function recordAttemptOutcome(target: string, success: boolean, failureClass?: WebFetchFailureClass): void {
+  const host = extractHostname(target);
+  if (!host) return;
+  const current = DOMAIN_ATTEMPT_MEMORY.get(host) ?? { success: 0, failure: 0 };
+  if (success) {
+    current.success += 1;
+  } else {
+    current.failure += 1;
+    current.lastFailureClass = failureClass;
+  }
+  DOMAIN_ATTEMPT_MEMORY.set(host, current);
+}
+
+function extractHostname(rawUrl: string): string | undefined {
+  try {
+    return new URL(rawUrl).hostname;
+  } catch {
+    return undefined;
+  }
+}
+
+export function resolveDomainNavigationPolicy(rawUrl: string): DomainNavigationPolicy & { hostname?: string } {
+  const normalized = normalizeWebSearchUrl(rawUrl);
+  const hostname = extractHostname(normalized);
+  if (!hostname) {
+    return { ...DEFAULT_DOMAIN_POLICY };
+  }
+  const rule = DOMAIN_POLICY_RULES.find((item) => item.matches(hostname));
+  if (!rule) {
+    return { ...DEFAULT_DOMAIN_POLICY, hostname };
+  }
+  return {
+    ...DEFAULT_DOMAIN_POLICY,
+    ...rule.overrides,
+    name: rule.name,
+    hostname,
+  };
+}
+
+function unwrapProxyLikeUrl(rawUrl: string): string {
+  try {
+    const parsed = new URL(rawUrl);
+    // Legacy wrapper format: https://r.jina.ai/https://example.com/path
+    if (parsed.hostname.endsWith('r.jina.ai')) {
+      const trimmedPath = decodeURIComponent(parsed.pathname).replace(/^\/+/, '');
+      if (!trimmedPath.startsWith('http://') && !trimmedPath.startsWith('https://')) {
+        return rawUrl;
+      }
+      const source = new URL(trimmedPath);
+      for (const [key, value] of parsed.searchParams.entries()) {
+        if (!source.searchParams.has(key)) {
+          source.searchParams.append(key, value);
+        }
+      }
+      return source.toString();
+    }
+    return rawUrl;
+  } catch {
+    return rawUrl;
+  }
 }
 
 function buildBlockedPageFallbackHtml(entry: WebSearchEntry, errors: string[]): string {
@@ -190,11 +367,13 @@ function buildBlockedPageFallbackHtml(entry: WebSearchEntry, errors: string[]): 
 </html>`;
 }
 
+type GotoResponse = { status: () => number } | null;
+
 type MinimalBrowserPage = {
   goto: (
     url: string,
     options: { waitUntil: 'domcontentloaded'; timeout: number }
-  ) => Promise<unknown>;
+  ) => Promise<GotoResponse>;
   title: () => Promise<string>;
   url: () => string;
   content: () => Promise<string>;
@@ -203,6 +382,68 @@ type MinimalBrowserPage = {
     options: { waitUntil: 'domcontentloaded'; timeout: number }
   ) => Promise<void>;
 };
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function classifyNavigationFailure(input: {
+  statusCode?: number;
+  title?: string;
+  loadedUrl?: string;
+  html?: string;
+  errorMessage?: string;
+}): WebFetchFailureClass {
+  const statusCode = input.statusCode;
+  if (statusCode != null) {
+    if (statusCode === 429 || statusCode === 408) return 'rate_limited';
+    if (statusCode >= 500) return 'http_5xx';
+    if (statusCode >= 400) return 'http_4xx';
+  }
+
+  if (isHumanVerificationWall(input.title, input.loadedUrl, input.html)) {
+    return 'challenge_wall';
+  }
+
+  const message = (input.errorMessage ?? '').toLowerCase();
+  if (!message) return 'unknown';
+  if (message.includes('timed out') || message.includes('timeout') || message.includes('etimedout')) {
+    return 'timeout';
+  }
+  if (message.includes('enotfound') || message.includes('dns') || message.includes('name not resolved')) {
+    return 'dns';
+  }
+  if (message.includes('certificate') || message.includes('ssl') || message.includes('tls')) {
+    return 'tls';
+  }
+  if (
+    message.includes('econnreset') ||
+    message.includes('econnrefused') ||
+    message.includes('network') ||
+    message.includes('socket hang up')
+  ) {
+    return 'network';
+  }
+  return 'unknown';
+}
+
+function computeRetryBackoffMs(failureClass: WebFetchFailureClass, attemptIndex: number): number {
+  return computeRetryBackoffMsWithPolicy(failureClass, attemptIndex, DEFAULT_DOMAIN_POLICY);
+}
+
+function computeRetryBackoffMsWithPolicy(
+  failureClass: WebFetchFailureClass,
+  attemptIndex: number,
+  policy: DomainNavigationPolicy
+): number {
+  const multiplier = Math.max(1, attemptIndex + 1);
+  if (failureClass === 'rate_limited') return policy.rateLimitBackoffMs * multiplier;
+  if (failureClass === 'http_5xx' || failureClass === 'network' || failureClass === 'timeout') {
+    return policy.baseBackoffMs * multiplier;
+  }
+  if (failureClass === 'challenge_wall') return policy.challengeBackoffMs * multiplier;
+  return 0;
+}
 
 export function isHumanVerificationWall(
   title?: string,
@@ -218,30 +459,95 @@ export function isHumanVerificationWall(
     return true;
   }
 
+  if (/\b403\s+forbidden\b/.test(combined) || /\b401\s+unauthorized\b/.test(combined)) {
+    return true;
+  }
+
   return HUMAN_VERIFICATION_TEXT_MARKERS.some((marker) => combined.includes(marker));
 }
 
-async function navigateWebSearchEntryWithFallback(
+export async function navigateWebSearchEntryWithFallback(
   page: MinimalBrowserPage,
   entry: WebSearchEntry
 ): Promise<WebSearchNavigationOutcome> {
-  const attempts = buildWebSearchNavigationAttempts(entry.url);
+  const policy = resolveDomainNavigationPolicy(entry.url);
+  const attempts = buildWebSearchNavigationAttempts(entry.url).slice(0, policy.maxAttempts);
   const errors: string[] = [];
+  const attemptDiagnostics: WebSearchAttemptDiagnostic[] = [];
+  let finalFailureClass: WebFetchFailureClass = 'unknown';
 
-  for (const attempt of attempts) {
+  for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
+    const attempt = attempts[attemptIndex];
+    const startedAt = Date.now();
     try {
-      await page.goto(attempt.target, {
+      const response = await page.goto(attempt.target, {
         waitUntil: 'domcontentloaded',
-        timeout: attempt.reason === 'direct' ? 15000 : 12000,
+        timeout: policy.navTimeoutMs,
       });
-      await new Promise((resolve) => setTimeout(resolve, 900));
+      if (response) {
+        const status = response.status();
+        if (status >= 400) {
+          const failureClass = classifyNavigationFailure({ statusCode: status });
+          finalFailureClass = failureClass;
+          errors.push(`${attempt.reason}:${failureClass}:http-${status}`);
+          attemptDiagnostics.push({
+            target: attempt.target,
+            reason: attempt.reason,
+            startedAt,
+            finishedAt: Date.now(),
+            durationMs: Date.now() - startedAt,
+            success: false,
+            statusCode: status,
+            failureClass,
+            message: `HTTP ${status}`,
+          });
+          recordAttemptOutcome(attempt.target, false, failureClass);
+          if (attemptIndex < attempts.length - 1) {
+            const backoffMs = computeRetryBackoffMsWithPolicy(failureClass, attemptIndex, policy);
+            if (backoffMs > 0) await sleep(backoffMs);
+          }
+          continue;
+        }
+      }
+      await sleep(policy.settleDelayMs);
       const pageTitle = await page.title().catch(() => undefined);
       const loadedUrl = page.url();
       const html = await page.content().catch(() => undefined);
       if (isHumanVerificationWall(pageTitle, loadedUrl, html)) {
-        errors.push(`${attempt.reason}:human-verification-wall`);
+        const failureClass: WebFetchFailureClass = 'challenge_wall';
+        finalFailureClass = failureClass;
+        errors.push(`${attempt.reason}:${failureClass}`);
+        attemptDiagnostics.push({
+          target: attempt.target,
+          reason: attempt.reason,
+          startedAt,
+          finishedAt: Date.now(),
+          durationMs: Date.now() - startedAt,
+          success: false,
+          loadedUrl,
+          title: pageTitle,
+          failureClass,
+          message: 'Human verification wall detected',
+        });
+        recordAttemptOutcome(attempt.target, false, failureClass);
+        if (attemptIndex < attempts.length - 1) {
+          const backoffMs = computeRetryBackoffMsWithPolicy(failureClass, attemptIndex, policy);
+          if (backoffMs > 0) await sleep(backoffMs);
+        }
         continue;
       }
+      recordAttemptOutcome(attempt.target, true);
+      attemptDiagnostics.push({
+        target: attempt.target,
+        reason: attempt.reason,
+        startedAt,
+        finishedAt: Date.now(),
+        durationMs: Date.now() - startedAt,
+        success: true,
+        loadedUrl,
+        title: pageTitle,
+        failureClass: 'none',
+      });
       return {
         ok: true,
         displayUrl: entry.normalizedUrl,
@@ -249,17 +555,40 @@ async function navigateWebSearchEntryWithFallback(
         title: pageTitle,
         mode: attempt.reason,
         errors,
+        diagnostics: {
+          attempts: attemptDiagnostics,
+          finalFailureClass: 'none',
+          policyName: policy.name,
+          hostname: policy.hostname,
+        },
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Navigation failed';
-      errors.push(`${attempt.reason}:${message}`);
+      const failureClass = classifyNavigationFailure({ errorMessage: message });
+      finalFailureClass = failureClass;
+      errors.push(`${attempt.reason}:${failureClass}:${message}`);
+      attemptDiagnostics.push({
+        target: attempt.target,
+        reason: attempt.reason,
+        startedAt,
+        finishedAt: Date.now(),
+        durationMs: Date.now() - startedAt,
+        success: false,
+        failureClass,
+        message,
+      });
+      recordAttemptOutcome(attempt.target, false, failureClass);
+      if (attemptIndex < attempts.length - 1) {
+        const backoffMs = computeRetryBackoffMsWithPolicy(failureClass, attemptIndex, policy);
+        if (backoffMs > 0) await sleep(backoffMs);
+      }
     }
   }
 
   try {
     const html = buildBlockedPageFallbackHtml(entry, errors);
     await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 5000 });
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await sleep(200);
     return {
       ok: true,
       displayUrl: entry.normalizedUrl,
@@ -267,6 +596,12 @@ async function navigateWebSearchEntryWithFallback(
       title: `Snapshot fallback: ${entry.title ?? entry.normalizedUrl}`,
       mode: 'fallback',
       errors,
+      diagnostics: {
+        attempts: attemptDiagnostics,
+        finalFailureClass,
+        policyName: policy.name,
+        hostname: policy.hostname,
+      },
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Fallback page render failed';
@@ -276,6 +611,15 @@ async function navigateWebSearchEntryWithFallback(
       displayUrl: entry.normalizedUrl,
       mode: 'fallback',
       errors,
+      diagnostics: {
+        attempts: attemptDiagnostics,
+        finalFailureClass:
+          finalFailureClass === 'unknown'
+            ? classifyNavigationFailure({ errorMessage: message })
+            : finalFailureClass,
+        policyName: policy.name,
+        hostname: policy.hostname,
+      },
     };
   }
 }
@@ -373,8 +717,8 @@ export function createBrowserObservableExecutor(
                 ? `Failed to load ${navigation.displayUrl}`
                 : navigation.mode === 'direct'
                   ? `Visited ${navigation.displayUrl} from web search`
-                  : navigation.mode === 'reader'
-                    ? `Visited ${navigation.displayUrl} via reader fallback`
+                : navigation.mode === 'reader'
+                    ? `Visited ${navigation.displayUrl} via fallback`
                     : `Captured fallback snapshot for blocked page ${navigation.displayUrl}`;
             const navigationError =
               navigation.ok
@@ -395,6 +739,8 @@ export function createBrowserObservableExecutor(
                 output: outputByMode,
                 error: navigationError,
                 mode: navigation.mode,
+                failureClass: navigation.diagnostics.finalFailureClass,
+                diagnostics: navigation.diagnostics,
                 originalUrl: entry.url,
                 normalizedUrl: entry.normalizedUrl,
                 loadedUrl: navigation.loadedUrl,

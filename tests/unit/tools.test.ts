@@ -9,7 +9,7 @@ process.env.CONFIG_PATH = path.join(process.cwd(), 'tests/fixtures/test-config.j
 
 // Clear config cache to ensure test config is loaded
 import { clearConfigCache } from '../../apps/api/src/services/config';
-import { clearSandboxManager } from '../../apps/api/src/services/sandbox';
+import { clearSandboxManager, getSandboxManager } from '../../apps/api/src/services/sandbox';
 clearConfigCache();
 clearSandboxManager();
 
@@ -248,6 +248,31 @@ describe('Phase 4: Tool System', () => {
   });
 
   describe('Bash Executor Tool', () => {
+    it('should fall back to direct execution when sandbox creation fails', async () => {
+      const sandboxManager = getSandboxManager() as any;
+      const originalIsEnabled = sandboxManager.isEnabled.bind(sandboxManager);
+      const originalCreateSandbox = sandboxManager.createSandbox.bind(sandboxManager);
+
+      sandboxManager.isEnabled = () => true;
+      sandboxManager.createSandbox = async () => {
+        throw new Error('Failed to create sandbox: HTTP code 500');
+      };
+
+      try {
+        const executor = getToolExecutor(toolContext);
+        const result = await executor.execute('bash_executor', {
+          command: 'echo "fallback-ok"',
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.output).toContain('fallback-ok');
+        expect(result.output).toContain('Sandbox unavailable');
+      } finally {
+        sandboxManager.isEnabled = originalIsEnabled;
+        sandboxManager.createSandbox = originalCreateSandbox;
+      }
+    });
+
     it('should execute simple command', async () => {
       const executor = getToolExecutor(toolContext);
       const result = await executor.execute('bash_executor', {

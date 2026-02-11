@@ -110,6 +110,105 @@ const SIDEBAR_OPEN_STORAGE_KEY = 'sidebar-open';
 const EXECUTION_MODE_STORAGE_KEY = 'execution-mode';
 const COMPUTER_STATE_PREFIX = 'mark-agent-computer-';
 
+function normalizePersistedScreenshot(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+
+  // Data URLs are safe to keep as-is.
+  if (trimmed.startsWith('data:image/')) return trimmed;
+
+  // Legacy bug: nested data URL prefix accidentally persisted.
+  const nestedPrefixMatch = trimmed.match(
+    /^data:image\/[a-zA-Z0-9+.-]+;base64,(data:image\/[a-zA-Z0-9+.-]+;base64,.*)$/
+  );
+  if (nestedPrefixMatch?.[1]) return nestedPrefixMatch[1];
+
+  // Blob URLs do not survive reload; drop them instead of rendering a black frame.
+  if (trimmed.startsWith('blob:')) return undefined;
+
+  // Legacy snapshots were sometimes stored as raw base64 payloads.
+  const compact = trimmed.replace(/\s+/g, '');
+  if (compact.length >= 64 && /^[A-Za-z0-9+/=]+$/.test(compact)) {
+    return `data:image/jpeg;base64,${compact}`;
+  }
+
+  return undefined;
+}
+
+function sanitizePersistedBrowserSession(session: BrowserSessionState): BrowserSessionState {
+  const actions = Array.isArray(session.actions)
+    ? session.actions.map((action) => ({
+        ...action,
+        screenshotDataUrl: normalizePersistedScreenshot(action.screenshotDataUrl),
+      }))
+    : [];
+
+  const currentActionIndex =
+    actions.length === 0
+      ? 0
+      : Math.max(0, Math.min(Number(session.currentActionIndex) || 0, actions.length - 1));
+
+  const status =
+    session.status === 'idle' ||
+    session.status === 'launching' ||
+    session.status === 'active' ||
+    session.status === 'closed'
+      ? session.status
+      : session.active
+        ? 'active'
+        : 'closed';
+
+  return {
+    ...session,
+    status,
+    actions,
+    currentActionIndex,
+  };
+}
+
+function sanitizePersistedAgentSteps(state: AgentStepTimelineState): AgentStepTimelineState {
+  const steps = Array.isArray(state.steps)
+    ? state.steps.map((step, index) => ({
+        ...step,
+        stepIndex: typeof step.stepIndex === 'number' && step.stepIndex >= 0 ? step.stepIndex : index,
+        snapshot: step.snapshot
+          ? {
+              ...step.snapshot,
+              stepIndex:
+                typeof step.snapshot.stepIndex === 'number' && step.snapshot.stepIndex >= 0
+                  ? step.snapshot.stepIndex
+                  : index,
+              screenshot: normalizePersistedScreenshot(step.snapshot.screenshot),
+            }
+          : step.snapshot,
+      }))
+    : [];
+
+  const currentStepIndex =
+    steps.length === 0
+      ? 0
+      : Math.max(0, Math.min(Number(state.currentStepIndex) || 0, steps.length - 1));
+
+  return {
+    steps,
+    currentStepIndex,
+  };
+}
+
+function sanitizePersistedPipelineState(state: PptPipelineState): PptPipelineState {
+  const browseActivity = Array.isArray(state.browseActivity)
+    ? state.browseActivity.map((item) => ({
+        ...item,
+        screenshotDataUrl: normalizePersistedScreenshot(item.screenshotDataUrl),
+      }))
+    : [];
+  return {
+    ...state,
+    browseActivity,
+  };
+}
+
 const getInitialSidebarOpen = () => {
   if (typeof localStorage === 'undefined') return true;
   const stored = localStorage.getItem(SIDEBAR_OPEN_STORAGE_KEY);
@@ -1021,12 +1120,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const next: Partial<ChatState> = {};
         if (data.browserSession != null) {
           const browserSession = new Map(state.browserSession);
-          browserSession.set(sessionId, data.browserSession);
+          browserSession.set(sessionId, sanitizePersistedBrowserSession(data.browserSession));
           next.browserSession = browserSession;
         }
         if (data.pptPipeline != null) {
           const pptPipeline = new Map(state.pptPipeline);
-          pptPipeline.set(sessionId, data.pptPipeline);
+          pptPipeline.set(sessionId, sanitizePersistedPipelineState(data.pptPipeline));
           next.pptPipeline = pptPipeline;
         }
         if (data.isPptTask != null) {
@@ -1036,7 +1135,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
         if (data.agentSteps != null) {
           const agentSteps = new Map(state.agentSteps);
-          agentSteps.set(sessionId, data.agentSteps);
+          agentSteps.set(sessionId, sanitizePersistedAgentSteps(data.agentSteps));
           next.agentSteps = agentSteps;
         }
         return next;

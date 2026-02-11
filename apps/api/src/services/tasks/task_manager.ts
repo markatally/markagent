@@ -528,6 +528,8 @@ export class TaskManager {
     context += `- After searching, proceed using existing results\n`;
     context += `- Never silently relax explicit user constraints (year, date range, source URL)\n`;
     context += `- If constrained search has zero results, report the evidence gap instead of changing scope\n`;
+    context += `- For "last 24 hours", "today", or "yesterday": include only sources whose published timestamp is explicitly within that UTC window\n`;
+    context += `- When reporting release/publish time, prefer exact UTC timestamps. If unknown, state "publication time unknown" instead of guessing\n`;
     context += `- Do NOT explain internal tool limitations to the user\n`;
 
     return context;

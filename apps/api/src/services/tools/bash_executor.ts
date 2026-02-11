@@ -84,7 +84,9 @@ export class BashExecutorTool implements Tool {
       // Check if sandbox is enabled
       const sandboxManager = getSandboxManager();
       if (sandboxManager.isEnabled()) {
-        return await this.executeInSandbox(command, cwd, startTime);
+        const allowDirectFallback =
+          (config.sandbox as any)?.fallbackToDirectOnFailure !== false;
+        return await this.executeInSandbox(command, cwd, startTime, allowDirectFallback);
       }
 
       // Fallback to direct execution
@@ -105,7 +107,8 @@ export class BashExecutorTool implements Tool {
   private async executeInSandbox(
     command: string,
     cwd: string,
-    startTime: number
+    startTime: number,
+    allowDirectFallback: boolean
   ): Promise<ToolResult> {
     const sandboxManager = getSandboxManager();
 
@@ -148,9 +151,31 @@ export class BashExecutorTool implements Tool {
         duration: Date.now() - startTime,
       };
     } catch (error: any) {
-      // If sandbox fails, log error but don't fallback to direct execution
-      // This maintains security isolation
       console.error('Sandbox execution failed:', error);
+      if (allowDirectFallback) {
+        console.warn(
+          '[bash_executor] Sandbox unavailable; falling back to direct execution for session',
+          this.context.sessionId
+        );
+        const fallback = await this.executeDirect(command, cwd, startTime);
+        const sandboxMessage = `Sandbox unavailable: ${error.message}`;
+        if (fallback.success) {
+          return {
+            ...fallback,
+            output:
+              fallback.output && fallback.output !== '(no output)'
+                ? `[${sandboxMessage}]` + '\n' + fallback.output
+                : `[${sandboxMessage}]`,
+          };
+        }
+        return {
+          success: false,
+          output: fallback.output,
+          error: `${sandboxMessage}; direct execution failed: ${fallback.error ?? 'unknown error'}`,
+          duration: Date.now() - startTime,
+        };
+      }
+
       return {
         success: false,
         output: '',

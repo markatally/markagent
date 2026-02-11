@@ -310,7 +310,22 @@ export class PptPipelineController {
         const entry = urls[i];
         try {
           console.log(`[PptPipeline] Navigating to: ${entry.url}`);
-          await page.goto(entry.url, { waitUntil: 'domcontentloaded', timeout: 12000 });
+          const response = await page.goto(entry.url, {
+            waitUntil: 'domcontentloaded',
+            timeout: 12000,
+          });
+          if (response && response.status() >= 400) {
+            console.error(
+              `[PptPipeline] Blocked response for ${entry.url}: HTTP ${response.status()}`
+            );
+            await this.emitEvent('browser.action', {
+              action: 'browser_navigate',
+              params: { url: entry.url },
+              success: false,
+              error: `HTTP ${response.status()}`,
+            });
+            continue;
+          }
           const finalUrl = page.url();
           const title = await page.title();
           manager.setCurrentUrl(this.sessionId, finalUrl, title);
