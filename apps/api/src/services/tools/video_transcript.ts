@@ -6,8 +6,11 @@ import { prisma } from '../prisma';
 import type { Tool, ToolContext, ToolResult, ProgressCallback } from './types';
 import {
   buildYtDlpMissingError,
+  buildWhisperMissingError,
   resolveYtDlpRunner,
+  resolveWhisperRunner,
   runYtDlpCommand,
+  runWhisperCommand,
 } from './video_runtime';
 
 type ExecFileResult = { stdout: string; stderr: string };
@@ -203,9 +206,9 @@ async function resolveSubtitlePath(
 export class VideoTranscriptTool implements Tool {
   name = 'video_transcript';
   description =
-    'Extract full transcript text from a video URL using available subtitle tracks and return downloadable transcript artifacts.';
+    'Extract full transcript text from a video URL. Tries subtitle tracks first; if none exist, falls back to Whisper speech-to-text transcription.';
   requiresConfirmation = false;
-  timeout = 120000;
+  timeout = 300000;
 
   inputSchema = {
     type: 'object' as const,
@@ -347,27 +350,58 @@ export class VideoTranscriptTool implements Tool {
     onProgress?.(55, 100, 'Parsing subtitle transcript...');
 
     const subtitlePath = await resolveSubtitlePath(outputDir, stem, language);
-    if (!subtitlePath) {
-      return {
-        success: false,
-        output: '',
-        error:
-          'No subtitle track was found for this video URL. Try a different language, set language to "auto", or provide authenticated cookies.',
-        duration: Date.now() - startTime,
-      };
+
+    if (subtitlePath) {
+      const subtitleContent = await fs.readFile(subtitlePath, 'utf8');
+      const segments = parseSubtitleSegments(subtitleContent);
+
+      if (segments.length === 0) {
+        return {
+          success: false,
+          output: '',
+          error: `Subtitle file was downloaded but no transcript content could be parsed: ${path.basename(subtitlePath)}`,
+          duration: Date.now() - startTime,
+        };
+      }
+
+      return this.buildTranscriptResult({
+        segments,
+        source: path.basename(subtitlePath),
+        language,
+        includeTimestamps,
+        stem,
+        outputDir,
+        startTime,
+        onProgress,
+      });
     }
 
-    const subtitleContent = await fs.readFile(subtitlePath, 'utf8');
-    const segments = parseSubtitleSegments(subtitleContent);
+    // No subtitle track found — fall back to Whisper speech-to-text
+    onProgress?.(60, 100, 'No subtitles found, falling back to Whisper transcription...');
+    return this.whisperFallback({
+      url,
+      language,
+      includeTimestamps,
+      cookiesFromBrowser,
+      stem,
+      outputDir,
+      startTime,
+      onProgress,
+      ytDlpRunner,
+    });
+  }
 
-    if (segments.length === 0) {
-      return {
-        success: false,
-        output: '',
-        error: `Subtitle file was downloaded but no transcript content could be parsed: ${path.basename(subtitlePath)}`,
-        duration: Date.now() - startTime,
-      };
-    }
+  private async buildTranscriptResult(opts: {
+    segments: TranscriptSegment[];
+    source: string;
+    language: string;
+    includeTimestamps: boolean;
+    stem: string;
+    outputDir: string;
+    startTime: number;
+    onProgress?: ProgressCallback;
+  }): Promise<ToolResult> {
+    const { segments, source, language, includeTimestamps, stem, outputDir, startTime, onProgress } = opts;
 
     const transcriptText = buildTranscriptText(segments, includeTimestamps);
     const transcriptFilename = `${stem}.transcript.txt`;
@@ -397,12 +431,21 @@ export class VideoTranscriptTool implements Tool {
 
     onProgress?.(100, 100, 'Transcript extraction complete');
 
+    // Include truncated transcript text in output so it flows into conversation history
+    const MAX_OUTPUT_TEXT = 8 * 1024;
+    const truncatedText = transcriptText.length > MAX_OUTPUT_TEXT
+      ? transcriptText.slice(0, MAX_OUTPUT_TEXT) + '\n...[truncated]'
+      : transcriptText;
+
     const summary = [
       'Transcript extraction completed.',
-      `Subtitle source: ${path.basename(subtitlePath)}`,
+      `Source: ${source}`,
       `Segments: ${segments.length}`,
       `Transcript file: ${transcriptFilename}`,
       `Path: ${relativeTranscriptPath}`,
+      '',
+      '--- Transcript ---',
+      truncatedText,
     ].join('\n');
 
     return {
@@ -422,7 +465,7 @@ export class VideoTranscriptTool implements Tool {
           type: 'data',
           name: 'video-transcript.json',
           content: JSON.stringify({
-            sourceSubtitleFile: path.basename(subtitlePath),
+            source,
             language,
             includeTimestamps,
             segmentCount: segments.length,
@@ -433,5 +476,163 @@ export class VideoTranscriptTool implements Tool {
         },
       ],
     };
+  }
+
+  private resolveWhisperLanguage(language: string): string | null {
+    const normalized = language.trim().toLowerCase();
+    if (!normalized || normalized === 'auto') return null;
+
+    const mapping: Record<string, string> = {
+      'zh-hans': 'zh',
+      'zh-hant': 'zh',
+      'zh-cn': 'zh',
+      'zh-tw': 'zh',
+      'chinese': 'zh',
+      'english': 'en',
+      'japanese': 'ja',
+      'korean': 'ko',
+      'french': 'fr',
+      'german': 'de',
+      'spanish': 'es',
+      'russian': 'ru',
+      'portuguese': 'pt',
+      'arabic': 'ar',
+    };
+
+    return mapping[normalized] ?? normalized.split('-')[0];
+  }
+
+  private async whisperFallback(opts: {
+    url: string;
+    language: string;
+    includeTimestamps: boolean;
+    cookiesFromBrowser: string;
+    stem: string;
+    outputDir: string;
+    startTime: number;
+    onProgress?: ProgressCallback;
+    ytDlpRunner: { command: string; baseArgs: string[]; label: string };
+  }): Promise<ToolResult> {
+    const { url, language, includeTimestamps, cookiesFromBrowser, stem, outputDir, startTime, onProgress, ytDlpRunner } = opts;
+
+    // 1. Resolve whisper runner
+    const whisperRunner = await resolveWhisperRunner(this.execFileFn);
+    if (!whisperRunner) {
+      return {
+        success: false,
+        output: '',
+        error: buildWhisperMissingError(),
+        duration: Date.now() - startTime,
+      };
+    }
+
+    // 2. Extract audio via yt-dlp
+    const audioPath = path.join(outputDir, `${stem}.wav`);
+    const audioArgs = [
+      '--no-playlist',
+      '--no-warnings',
+      '--extract-audio',
+      '--audio-format', 'wav',
+      '--output', audioPath,
+    ];
+    if (cookiesFromBrowser) {
+      audioArgs.push('--cookies-from-browser', cookiesFromBrowser);
+    }
+    audioArgs.push(url);
+
+    onProgress?.(65, 100, 'Extracting audio for Whisper transcription...');
+
+    try {
+      await runYtDlpCommand(this.execFileFn, ytDlpRunner, audioArgs, {
+        timeout: this.timeout,
+        maxBuffer: 30 * 1024 * 1024,
+      });
+    } catch (error: any) {
+      return {
+        success: false,
+        output: '',
+        error: `Failed to extract audio for Whisper: ${error?.stderr || error?.message || 'unknown error'}`,
+        duration: Date.now() - startTime,
+      };
+    }
+
+    // Verify audio file exists
+    try {
+      await fs.access(audioPath);
+    } catch {
+      return {
+        success: false,
+        output: '',
+        error: 'Audio extraction completed but WAV file was not found.',
+        duration: Date.now() - startTime,
+      };
+    }
+
+    // 3. Run whisper
+    onProgress?.(75, 100, 'Running Whisper speech-to-text (this may take a few minutes)...');
+
+    const whisperArgs = [audioPath, '--model', 'medium', '--output_format', 'srt', '--output_dir', outputDir];
+    const whisperLang = this.resolveWhisperLanguage(language);
+    if (whisperLang) {
+      whisperArgs.push('--language', whisperLang);
+    }
+
+    try {
+      await runWhisperCommand(this.execFileFn, whisperRunner, whisperArgs, {
+        timeout: this.timeout,
+        maxBuffer: 30 * 1024 * 1024,
+      });
+    } catch (error: any) {
+      // Clean up audio file
+      await fs.rm(audioPath, { force: true }).catch(() => {});
+      return {
+        success: false,
+        output: '',
+        error: `Whisper transcription failed: ${error?.stderr || error?.message || 'unknown error'}`,
+        duration: Date.now() - startTime,
+      };
+    }
+
+    // 4. Parse SRT output
+    const srtPath = path.join(outputDir, `${stem}.srt`);
+    let srtContent: string;
+    try {
+      srtContent = await fs.readFile(srtPath, 'utf8');
+    } catch {
+      // Clean up audio file
+      await fs.rm(audioPath, { force: true }).catch(() => {});
+      return {
+        success: false,
+        output: '',
+        error: 'Whisper completed but SRT output file was not found.',
+        duration: Date.now() - startTime,
+      };
+    }
+
+    const segments = parseSubtitleSegments(srtContent);
+
+    // 5. Clean up temporary audio file
+    await fs.rm(audioPath, { force: true }).catch(() => {});
+
+    if (segments.length === 0) {
+      return {
+        success: false,
+        output: '',
+        error: 'Whisper transcription produced no recognizable speech segments.',
+        duration: Date.now() - startTime,
+      };
+    }
+
+    // 6. Build result using shared method
+    return this.buildTranscriptResult({
+      segments,
+      source: `whisper:${path.basename(srtPath)}`,
+      language,
+      includeTimestamps,
+      stem,
+      outputDir,
+      startTime,
+      onProgress,
+    });
   }
 }

@@ -6,6 +6,7 @@ import { prisma } from '../prisma';
 import type { Tool, ToolContext, ToolResult, ProgressCallback } from './types';
 import {
   buildYtDlpMissingError,
+  categorizeYtDlpError,
   resolveYtDlpRunner,
   runYtDlpCommand,
 } from './video_runtime';
@@ -115,41 +116,6 @@ async function resolveDownloadedFilePath(
   return newestPath;
 }
 
-async function tryInstallYtDlp(
-  execFileFn: ExecFileFn,
-  onProgress?: ProgressCallback
-): Promise<boolean> {
-  const installCommands: Array<{ command: string; args: string[] }> = [
-    {
-      command: 'python3',
-      args: ['-m', 'pip', 'install', '--user', 'yt-dlp'],
-    },
-    {
-      command: 'pip3',
-      args: ['install', '--user', 'yt-dlp'],
-    },
-    {
-      command: 'python3',
-      args: ['-m', 'pip', 'install', 'yt-dlp'],
-    },
-  ];
-
-  for (const candidate of installCommands) {
-    try {
-      onProgress?.(8, 100, `Installing yt-dlp via: ${candidate.command} ${candidate.args.join(' ')}`);
-      await execFileFn(candidate.command, candidate.args, {
-        timeout: 180000,
-        maxBuffer: 20 * 1024 * 1024,
-      });
-      return true;
-    } catch {
-      // try next installer
-    }
-  }
-
-  return false;
-}
-
 export class VideoDownloadTool implements Tool {
   name = 'video_download';
   description =
@@ -244,18 +210,14 @@ export class VideoDownloadTool implements Tool {
       };
     }
 
-    let ytDlpRunner = await resolveYtDlpRunner(this.execFileFn);
-    if (!ytDlpRunner) {
-      const installed = await tryInstallYtDlp(this.execFileFn, onProgress);
-      if (installed) {
-        ytDlpRunner = await resolveYtDlpRunner(this.execFileFn);
-      }
-    }
+    onProgress?.(2, 100, 'Checking yt-dlp availability...');
+
+    const ytDlpRunner = await resolveYtDlpRunner(this.execFileFn);
     if (!ytDlpRunner) {
       return {
         success: false,
         output: '',
-        error: `${buildYtDlpMissingError()} Automatic installation attempt failed.`,
+        error: buildYtDlpMissingError(),
         duration: Date.now() - startTime,
       };
     }
@@ -355,10 +317,11 @@ export class VideoDownloadTool implements Tool {
         ],
       };
     } catch (error: any) {
+      const categorized = categorizeYtDlpError(error);
       return {
         success: false,
         output: '',
-        error: error?.stderr || error?.message || 'Video download failed',
+        error: JSON.stringify(categorized),
         duration: Date.now() - startTime,
       };
     }

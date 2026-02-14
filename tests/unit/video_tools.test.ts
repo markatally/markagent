@@ -142,14 +142,9 @@ describe('VideoDownloadTool', () => {
     expect(seenCommands).toContain('python3');
   });
 
-  it('attempts auto-install before failing when all yt-dlp runners are missing', async () => {
-    const seenInvocations: Array<string> = [];
+  it('returns structured YTDLP_NOT_FOUND error when all yt-dlp runners are missing', async () => {
     const tool = new VideoDownloadTool(mockContext, {
-      execFileFn: async (command, args) => {
-        seenInvocations.push(`${command} ${args.join(' ')}`.trim());
-        if (args.includes('pip') || command === 'pip3') {
-          throw new Error('install failed');
-        }
+      execFileFn: async () => {
         throw new Error('runner missing');
       },
     });
@@ -160,8 +155,11 @@ describe('VideoDownloadTool', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('Automatic installation attempt failed');
-    expect(seenInvocations.some((value) => value.startsWith('python3 -m pip install --user yt-dlp'))).toBe(true);
+    const parsed = JSON.parse(result.error!);
+    expect(parsed.code).toBe('YTDLP_NOT_FOUND');
+    expect(parsed.installCommands).toBeDefined();
+    expect(parsed.installCommands.length).toBeGreaterThan(0);
+    expect(parsed.recoveryHint).toContain('bash_executor');
   });
 });
 
@@ -236,6 +234,163 @@ describe('VideoTranscriptTool', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('Install with: pip install yt-dlp');
+    const parsed = JSON.parse(result.error!);
+    expect(parsed.code).toBe('YTDLP_NOT_FOUND');
+    expect(parsed.installCommands).toBeDefined();
+  });
+
+  it('falls back to Whisper when no subtitles are found', async () => {
+    let persistedFilename = '';
+    const tool = new VideoTranscriptTool(mockContext, {
+      execFileFn: async (command, args) => {
+        // yt-dlp version check
+        if (args.includes('--version')) {
+          return { stdout: '2026.01.01\n', stderr: '' };
+        }
+        // yt-dlp subtitle extraction — produce no subtitle files
+        if (args.includes('--write-subs')) {
+          const outputIndex = args.findIndex((v) => v === '--output');
+          const template = outputIndex >= 0 ? args[outputIndex + 1] : '';
+          await fs.mkdir(path.dirname(template), { recursive: true });
+          // No subtitle files written
+          return { stdout: '', stderr: '' };
+        }
+        // whisper --help probe
+        if (args.includes('--help') && (command === 'whisper' || args.includes('whisper'))) {
+          return { stdout: 'usage: whisper', stderr: '' };
+        }
+        // yt-dlp audio extraction
+        if (args.includes('--extract-audio')) {
+          const outputIndex = args.findIndex((v) => v === '--output');
+          const audioPath = outputIndex >= 0 ? args[outputIndex + 1] : '';
+          await fs.mkdir(path.dirname(audioPath), { recursive: true });
+          await fs.writeFile(audioPath, 'fake wav data');
+          return { stdout: '', stderr: '' };
+        }
+        // whisper transcription
+        if (args.includes('--output_format')) {
+          const audioArg = args.find((a) => a.endsWith('.wav'));
+          const dirIndex = args.findIndex((v) => v === '--output_dir');
+          const outputDir = dirIndex >= 0 ? args[dirIndex + 1] : '';
+          const stem = path.basename(audioArg || '', '.wav');
+          const srtPath = path.join(outputDir, `${stem}.srt`);
+          await fs.writeFile(
+            srtPath,
+            [
+              '1',
+              '00:00:00,000 --> 00:00:03,000',
+              'Whisper transcribed line one',
+              '',
+              '2',
+              '00:00:03,000 --> 00:00:06,000',
+              'Whisper transcribed line two',
+              '',
+            ].join('\n'),
+            'utf8'
+          );
+          return { stdout: '', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      },
+      persistFileRecord: async (input) => {
+        persistedFilename = input.filename;
+        return 'file-whisper-789';
+      },
+    });
+
+    const result = await tool.execute({
+      url: 'https://example.com/no-subs-video',
+      language: 'zh',
+      includeTimestamps: true,
+      filename: 'whisper-fallback-test',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('Transcript extraction completed.');
+    expect(result.output).toContain('whisper:');
+    expect(persistedFilename).toBe('whisper-fallback-test.transcript.txt');
+    expect(result.artifacts?.length).toBe(2);
+
+    const dataArtifact = result.artifacts?.find((item) => item.name === 'video-transcript.json');
+    const payload = JSON.parse(String(dataArtifact?.content || '{}'));
+    expect(payload.segmentCount).toBe(2);
+    expect(payload.transcript).toContain('Whisper transcribed line one');
+  });
+
+  it('returns WHISPER_NOT_FOUND error when whisper missing and no subtitles', async () => {
+    const tool = new VideoTranscriptTool(mockContext, {
+      execFileFn: async (command, args) => {
+        // yt-dlp version check succeeds
+        if (args.includes('--version')) {
+          if (command === 'yt-dlp') return { stdout: '2026.01.01\n', stderr: '' };
+          throw new Error('not found');
+        }
+        // yt-dlp subtitle extraction — no subtitle files
+        if (args.includes('--write-subs')) {
+          const outputIndex = args.findIndex((v) => v === '--output');
+          const template = outputIndex >= 0 ? args[outputIndex + 1] : '';
+          await fs.mkdir(path.dirname(template), { recursive: true });
+          return { stdout: '', stderr: '' };
+        }
+        // whisper --help probe fails for all candidates
+        if (args.includes('--help')) {
+          throw new Error('whisper not found');
+        }
+        return { stdout: '', stderr: '' };
+      },
+    });
+
+    const result = await tool.execute({
+      url: 'https://example.com/no-subs-video',
+      filename: 'whisper-missing-test',
+    });
+
+    expect(result.success).toBe(false);
+    const parsed = JSON.parse(result.error!);
+    expect(parsed.code).toBe('WHISPER_NOT_FOUND');
+    expect(parsed.installCommands).toBeDefined();
+    expect(parsed.installCommands.length).toBeGreaterThan(0);
+  });
+
+  it('includes transcript text in output field for conversation history', async () => {
+    const tool = new VideoTranscriptTool(mockContext, {
+      execFileFn: async (_command, args) => {
+        if (args.includes('--version')) {
+          return { stdout: '2026.01.01\n', stderr: '' };
+        }
+        const outputIndex = args.findIndex((v) => v === '--output');
+        const template = outputIndex >= 0 ? args[outputIndex + 1] : '';
+        const subtitlePath = template.replace('.%(ext)s', '.en.vtt');
+        await fs.mkdir(path.dirname(subtitlePath), { recursive: true });
+        await fs.writeFile(
+          subtitlePath,
+          [
+            'WEBVTT',
+            '',
+            '00:00:00.000 --> 00:00:02.000',
+            'First line of dialogue',
+            '',
+            '00:00:02.000 --> 00:00:04.000',
+            'Second line of dialogue',
+            '',
+          ].join('\n'),
+          'utf8'
+        );
+        return { stdout: '', stderr: '' };
+      },
+      persistFileRecord: async () => 'file-output-check',
+    });
+
+    const result = await tool.execute({
+      url: 'https://example.com/video',
+      language: 'en',
+      includeTimestamps: true,
+      filename: 'output-text-test',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('--- Transcript ---');
+    expect(result.output).toContain('First line of dialogue');
+    expect(result.output).toContain('Second line of dialogue');
   });
 });

@@ -375,6 +375,12 @@ async function processAgentTurn(
 
   const reasoningTimers = new Map<string, number>();
   const searchToolNames = new Set(['web_search', 'paper_search']);
+  const videoToolNames = new Set(['video_download', 'video_probe', 'video_transcript']);
+  const videoToolLabels: Record<string, string> = {
+    video_probe: 'Probing video',
+    video_download: 'Downloading video',
+    video_transcript: 'Extracting transcript',
+  };
   let reasoningStepCounter = 0;
   let pendingThinkingStepId: string | null = null;
   let generatingStepId: string | null = null;
@@ -576,7 +582,7 @@ async function processAgentTurn(
 
         await emitReasoningStep({
           stepId: toolReasoningStepId,
-          label: isSearch ? 'Searching' : 'Executing tool',
+          label: isSearch ? 'Searching' : videoToolLabels[chunk.toolCall.name] || 'Executing tool',
           status: 'running',
           message: isSearch
             ? `Executing ${queries?.length || 1} search quer${queries?.length === 1 ? 'y' : 'ies'}...`
@@ -704,7 +710,7 @@ async function processAgentTurn(
 
         await emitReasoningStep({
           stepId: `tool-${toolCall.id}`,
-          label: searchToolNames.has(toolCall.name) ? 'Searching' : 'Executing tool',
+          label: searchToolNames.has(toolCall.name) ? 'Searching' : videoToolLabels[toolCall.name] || 'Executing tool',
           status: 'completed',
           message: toolCheck.reason || 'Tool call not allowed.',
           details: {
@@ -810,7 +816,7 @@ async function processAgentTurn(
 
         await emitReasoningStep({
           stepId: `tool-${toolCall.id}`,
-          label: searchToolNames.has(toolCall.name) ? 'Searching' : 'Executing tool',
+          label: searchToolNames.has(toolCall.name) ? 'Searching' : videoToolLabels[toolCall.name] || 'Executing tool',
           status: 'completed',
           message: result.success ? undefined : 'Failed.',
           details: {
@@ -845,7 +851,7 @@ async function processAgentTurn(
 
         await emitReasoningStep({
           stepId: `tool-${toolCall.id}`,
-          label: searchToolNames.has(toolCall.name) ? 'Searching' : 'Executing tool',
+          label: searchToolNames.has(toolCall.name) ? 'Searching' : videoToolLabels[toolCall.name] || 'Executing tool',
           status: 'completed',
           message: errorMsg,
           details: {
@@ -1098,9 +1104,11 @@ IMPORTANT RULES:
   systemPromptContentGet += `
 
 DEPENDENCY RECOVERY RULES:
-1. If a tool fails because yt-dlp is missing and bash_executor is available, run a safe user-level install command and retry once.
-2. Prefer: python3 -m pip install --user yt-dlp
-3. Do NOT claim you cannot install dependencies without attempting recovery first.`;
+1. If a tool returns a structured error with code YTDLP_NOT_FOUND, read the installCommands array and use bash_executor to install yt-dlp, then retry the tool once.
+2. If a tool returns FORMAT_UNAVAILABLE, retry with lower quality (720p → 480p) or switch to mkv container.
+3. If a tool returns NETWORK_ERROR, verify the URL and suggest cookiesFromBrowser for auth-gated sites.
+4. Never give up after a single tool failure — always attempt at least one recovery step before reporting failure to the user.
+5. Report each recovery step to the user (e.g., "Installing yt-dlp...", "Retrying at 720p...").`;
 
   // Always use fresh system prompt with current skill list (skills may change mid-conversation)
   const sysIdx = llmMessages.findIndex((m) => m.role === 'system');
@@ -1556,9 +1564,11 @@ IMPORTANT RULES:
   systemPromptContent += `
 
 DEPENDENCY RECOVERY RULES:
-1. If a tool fails because yt-dlp is missing and bash_executor is available, run a safe user-level install command and retry once.
-2. Prefer: python3 -m pip install --user yt-dlp
-3. Do NOT claim you cannot install dependencies without attempting recovery first.`;
+1. If a tool returns a structured error with code YTDLP_NOT_FOUND, read the installCommands array and use bash_executor to install yt-dlp, then retry the tool once.
+2. If a tool returns FORMAT_UNAVAILABLE, retry with lower quality (720p → 480p) or switch to mkv container.
+3. If a tool returns NETWORK_ERROR, verify the URL and suggest cookiesFromBrowser for auth-gated sites.
+4. Never give up after a single tool failure — always attempt at least one recovery step before reporting failure to the user.
+5. Report each recovery step to the user (e.g., "Installing yt-dlp...", "Retrying at 720p...").`;
   
   // Only add to llmMessages if not using a skill invocation (skill invocation sets its own prompt)
   if (!skillInvocation) {

@@ -8,8 +8,8 @@
 
 | Field | Value |
 |-------|-------|
-| **Last Updated** | 2026-02-08 |
-| **Active Phase** | Phase 11 - Manus Computer Mode Upgrade |
+| **Last Updated** | 2026-02-15 |
+| **Active Phase** | Whisper Audio Transcription Fallback |
 | **Status** | ✅ Complete |
 | **Blocked By** | None |
 
@@ -443,6 +443,23 @@ bun run sync:skills --unprotect=<id>  # Unprotect skill
 
 <details>
 <summary>Click to expand session history</summary>
+
+### Session 15 — 2026-02-15
+
+**Whisper Audio Transcription Fallback - COMPLETE:**
+
+**Problem:** `video_transcript` tool only extracted existing subtitle/caption tracks. When videos have no subtitles (common on Bilibili), it failed with "No subtitle track was found" and the agent gave up.
+
+**Solution:** Added automatic Whisper speech-to-text fallback when no subtitles exist.
+
+**Changes (5 files, ~200 lines):**
+- `video_runtime.ts` — Added `WhisperRunner` type, `resolveWhisperRunner()`, `runWhisperCommand()`, `buildWhisperMissingError()` (mirrors yt-dlp pattern)
+- `video_transcript.ts` — Added `whisperFallback()` method (extract audio → run whisper → parse SRT), refactored `buildTranscriptResult()`, included transcript text in output (8KB cap), increased timeout to 300s
+- `system.ts` — Added Whisper fallback + stored transcript reuse instructions to `VIDEO_DOWNLOAD_WORKFLOW`
+- `start.sh` — Added openai-whisper auto-install block after ffmpeg
+- `video_tools.test.ts` — Added 3 tests: Whisper fallback success, WHISPER_NOT_FOUND error, transcript text in output
+
+**Tests:** 10/10 passing (7 existing + 3 new)
 
 ### Session 14 — 2026-02-08
 

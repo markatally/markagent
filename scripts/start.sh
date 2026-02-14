@@ -58,6 +58,11 @@ for arg in "$@"; do
       echo "  - Backend API (localhost:4000)"
       echo "  - Frontend (localhost:3000)"
       echo ""
+      echo "Auto-installed if missing:"
+      echo "  - yt-dlp (video download/probe/transcript)"
+      echo "  - ffmpeg (video stream merging)"
+      echo "  - openai-whisper (speech-to-text fallback for videos without subtitles)"
+      echo ""
       echo "Optional: Enable browser.enabled in config/default.json and use"
       echo "  --install-browser to install Chromium for real-browser Computer mode."
       exit 0
@@ -84,6 +89,53 @@ fi
 if ! command -v docker &> /dev/null; then
   echo -e "${RED}Error: docker is not installed or not in PATH.${NC}"
   exit 1
+fi
+
+# Check and install yt-dlp (required for video download/probe/transcript tools)
+if ! command -v yt-dlp &> /dev/null; then
+  echo -e "${YELLOW}  yt-dlp not found. Installing...${NC}"
+  if [[ "$OSTYPE" == "darwin"* ]] && command -v brew &> /dev/null; then
+    brew install yt-dlp || pip3 install --user yt-dlp || true
+  else
+    pip3 install --user yt-dlp || python3 -m pip install --user yt-dlp || true
+  fi
+  if command -v yt-dlp &> /dev/null; then
+    echo -e "${GREEN}  ✓ yt-dlp installed ($(yt-dlp --version))${NC}"
+  else
+    echo -e "${YELLOW}  ⚠ yt-dlp installation failed. Video tools will attempt auto-recovery at runtime.${NC}"
+  fi
+else
+  echo -e "${GREEN}  ✓ yt-dlp available ($(yt-dlp --version))${NC}"
+fi
+
+# Check ffmpeg (required by yt-dlp for merging video+audio streams)
+if ! command -v ffmpeg &> /dev/null; then
+  echo -e "${YELLOW}  ffmpeg not found. Installing...${NC}"
+  if [[ "$OSTYPE" == "darwin"* ]] && command -v brew &> /dev/null; then
+    brew install ffmpeg || true
+  else
+    sudo apt-get install -y ffmpeg 2>/dev/null || true
+  fi
+  if command -v ffmpeg &> /dev/null; then
+    echo -e "${GREEN}  ✓ ffmpeg installed${NC}"
+  else
+    echo -e "${YELLOW}  ⚠ ffmpeg not installed. Video merging may fail.${NC}"
+  fi
+else
+  echo -e "${GREEN}  ✓ ffmpeg available${NC}"
+fi
+
+# Check and install openai-whisper (fallback for video transcription when no subtitles)
+if ! command -v whisper &> /dev/null; then
+  echo -e "${YELLOW}  whisper not found. Installing openai-whisper...${NC}"
+  pip3 install openai-whisper 2>/dev/null || python3 -m pip install openai-whisper 2>/dev/null || true
+  if command -v whisper &> /dev/null; then
+    echo -e "${GREEN}  ✓ openai-whisper installed${NC}"
+  else
+    echo -e "${YELLOW}  ⚠ openai-whisper installation failed. Whisper transcription fallback will be unavailable.${NC}"
+  fi
+else
+  echo -e "${GREEN}  ✓ whisper available${NC}"
 fi
 
 echo -e "${GREEN}  ✓ Prerequisites OK${NC}"

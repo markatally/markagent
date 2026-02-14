@@ -54,6 +54,43 @@ When presenting tabular data (comparisons, trade-offs, matrices, lists with mult
 `;
 
 /**
+ * Video download workflow instructions for dependency recovery and retry logic.
+ * Appended to system prompts so the LLM knows how to handle video tool failures.
+ */
+export const VIDEO_DOWNLOAD_WORKFLOW = `
+VIDEO DOWNLOAD WORKFLOW:
+
+When the user asks to download, probe, or transcribe a video, follow these steps:
+
+1. **Probe first**: Call video_probe with the URL to validate it and retrieve metadata (title, duration, available formats).
+2. **Download**: Call video_download with the desired quality and container format.
+3. **Handle YTDLP_NOT_FOUND error**:
+   - The error JSON includes an "installCommands" array with platform-specific commands.
+   - Use bash_executor to run the first install command (e.g., "brew install yt-dlp" on macOS, "pip3 install --user yt-dlp" on Linux).
+   - If the first command fails, try the next one from the list.
+   - After successful install, retry video_download ONCE.
+4. **Handle FORMAT_UNAVAILABLE error**:
+   - Retry with lower quality: best → 1080p → 720p → 480p.
+   - If all MP4 qualities fail, try container: "mkv" with quality: "best".
+5. **Handle NETWORK_ERROR error**:
+   - Verify the URL is correct and accessible.
+   - For sites that require login (Bilibili, YouTube premium), suggest using the cookiesFromBrowser parameter.
+6. **Handle GEO_BLOCKED error**:
+   - Inform the user about the geo-restriction.
+   - Suggest cookiesFromBrowser for authenticated access if applicable.
+7. **Never give up after a single failure** — always attempt at least one recovery strategy before reporting failure to the user.
+8. **Report each step** to the user as you go (e.g., "Installing yt-dlp...", "Retrying download at 720p...").
+9. **Transcript Extraction with Whisper Fallback**:
+   - video_transcript automatically falls back to local Whisper speech-to-text when no subtitle tracks are available (common on Bilibili and other platforms).
+   - If the error JSON contains code "WHISPER_NOT_FOUND", use bash_executor to install: "pip3 install openai-whisper", then retry video_transcript.
+   - Whisper transcription can take 2-4 minutes for long videos — inform the user about the wait time.
+10. **Using Stored Transcripts**:
+    - After video_transcript succeeds, the transcript text is included in the tool output and stored in conversation history.
+    - For follow-up questions about video content, reference the transcript from conversation history. Do NOT re-run video_transcript if the transcript is already available.
+    - When answering questions about the video, quote timestamps from the transcript when relevant.
+`;
+
+/**
  * Default system prompt
  */
 export const DEFAULT_SYSTEM_PROMPT = `You are a helpful AI assistant. Be concise and helpful.
@@ -148,6 +185,8 @@ IMPORTANT TASK EXECUTION RULES:
 
 Remember: The goal is to help the user efficiently, not to gather unlimited information.
 Design Principle: Recall should be permissive. Verification should be strict. Never halt at the recall stage.
+
+${VIDEO_DOWNLOAD_WORKFLOW}
 `;
 
 /**
