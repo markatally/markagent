@@ -352,6 +352,132 @@ describe('VideoTranscriptTool', () => {
     expect(parsed.installCommands.length).toBeGreaterThan(0);
   });
 
+  it('auto-retries with browser cookies when subtitles need login', async () => {
+    const cookiesUsed: string[] = [];
+    let persistedFilename = '';
+    const tool = new VideoTranscriptTool(mockContext, {
+      execFileFn: async (_command, args) => {
+        if (args.includes('--version')) {
+          return { stdout: '2026.01.01\n', stderr: '' };
+        }
+        if (args.includes('--write-subs')) {
+          const outputIndex = args.findIndex((v) => v === '--output');
+          const template = outputIndex >= 0 ? args[outputIndex + 1] : '';
+          await fs.mkdir(path.dirname(template), { recursive: true });
+
+          const cookieIndex = args.findIndex((v) => v === '--cookies-from-browser');
+          const browser = cookieIndex >= 0 ? args[cookieIndex + 1] : null;
+
+          if (!browser) {
+            // First attempt without cookies: return auth warning, no subtitle files
+            cookiesUsed.push('none');
+            return {
+              stdout: '',
+              stderr: 'WARNING: [BiliBili] Subtitles are only available when logged in. Use --cookies-from-browser or --cookies for the authentication.',
+            };
+          }
+
+          // Retry with browser cookies
+          cookiesUsed.push(browser);
+          if (browser === 'chrome') {
+            // Simulate successful subtitle download with chrome cookies
+            const subtitlePath = template.replace('.%(ext)s', '.ai-zh.srt');
+            await fs.writeFile(
+              subtitlePath,
+              [
+                '1',
+                '00:00:00,080 --> 00:00:03,080',
+                '自动重试成功的字幕内容',
+                '',
+              ].join('\n'),
+              'utf8'
+            );
+          }
+          return { stdout: '', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      },
+      persistFileRecord: async (input) => {
+        persistedFilename = input.filename;
+        return 'file-auto-retry';
+      },
+    });
+
+    const result = await tool.execute({
+      url: 'https://www.bilibili.com/video/BV1itzyBJErX',
+      language: 'zh',
+      includeTimestamps: true,
+      filename: 'auth-retry-test',
+      // No cookiesFromBrowser — should auto-retry
+    });
+
+    // Should have tried without cookies first, then retried with chrome
+    expect(cookiesUsed).toContain('none');
+    expect(cookiesUsed).toContain('chrome');
+    // Should succeed via auto-retry
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('Transcript extraction completed.');
+    expect(persistedFilename).toBe('auth-retry-test.transcript.txt');
+  });
+
+  it('handles Bilibili ai-zh subtitle tracks correctly', async () => {
+    let persistedFilename = '';
+    const tool = new VideoTranscriptTool(mockContext, {
+      execFileFn: async (_command, args) => {
+        if (args.includes('--version')) {
+          return { stdout: '2026.01.01\n', stderr: '' };
+        }
+
+        const outputIndex = args.findIndex((v) => v === '--output');
+        const template = outputIndex >= 0 ? args[outputIndex + 1] : '';
+        // Simulate Bilibili writing an ai-zh.srt file
+        const subtitlePath = template.replace('.%(ext)s', '.ai-zh.srt');
+        await fs.mkdir(path.dirname(subtitlePath), { recursive: true });
+        await fs.writeFile(
+          subtitlePath,
+          [
+            '1',
+            '00:00:00,080 --> 00:00:03,080',
+            '这期视频呢会跟大家分享一下这三部分的内容',
+            '',
+            '2',
+            '00:00:03,080 --> 00:00:04,680',
+            'clouds skills的工作原理',
+            '',
+            '3',
+            '00:00:04,680 --> 00:00:07,480',
+            '了解一点原理是必不可少的',
+            '',
+          ].join('\n'),
+          'utf8'
+        );
+        return { stdout: '', stderr: '' };
+      },
+      persistFileRecord: async (input) => {
+        persistedFilename = input.filename;
+        return 'file-bilibili-ai-zh';
+      },
+    });
+
+    const result = await tool.execute({
+      url: 'https://www.bilibili.com/video/BV1itzyBJErX',
+      language: 'zh',
+      includeTimestamps: true,
+      filename: 'bilibili-ai-zh-test',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('Transcript extraction completed.');
+    expect(result.output).toContain('ai-zh.srt');
+    expect(persistedFilename).toBe('bilibili-ai-zh-test.transcript.txt');
+
+    const dataArtifact = result.artifacts?.find((item) => item.name === 'video-transcript.json');
+    const payload = JSON.parse(String(dataArtifact?.content || '{}'));
+    expect(payload.segmentCount).toBe(3);
+    expect(payload.transcript).toContain('这期视频呢会跟大家分享一下这三部分的内容');
+    expect(payload.transcript).toContain('clouds skills的工作原理');
+  });
+
   it('includes transcript text in output field for conversation history', async () => {
     const tool = new VideoTranscriptTool(mockContext, {
       execFileFn: async (_command, args) => {

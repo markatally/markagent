@@ -11,6 +11,7 @@ import {
   resolveWhisperRunner,
   runYtDlpCommand,
   runWhisperCommand,
+  type YtDlpRunner,
 } from './video_runtime';
 
 type ExecFileResult = { stdout: string; stderr: string };
@@ -139,7 +140,7 @@ function buildTranscriptText(
 function buildSubtitleLanguageSelector(language: string): string {
   const normalized = language.trim().toLowerCase();
   if (!normalized || normalized === 'auto') {
-    return 'all,-live_chat';
+    return 'all,-live_chat,-danmaku';
   }
 
   const primary = normalized.split('-')[0];
@@ -148,11 +149,15 @@ function buildSubtitleLanguageSelector(language: string): string {
     `${normalized}.*`,
     primary,
     `${primary}.*`,
+    // Bilibili uses ai-{lang} for AI-generated subtitles (e.g. ai-zh, ai-en)
+    `ai-${primary}`,
+    `ai-${normalized}`,
     'en',
     'en.*',
+    'ai-en',
   ]);
 
-  return `${Array.from(candidates).join(',')},-live_chat`;
+  return `${Array.from(candidates).join(',')},-live_chat,-danmaku`;
 }
 
 function scoreSubtitleCandidate(
@@ -171,7 +176,11 @@ function scoreSubtitleCandidate(
 
   if (normalized.includes(`.${preferred}.`)) score += 80;
   if (normalized.includes(`.${preferredPrimary}.`)) score += 60;
+  // Bilibili AI-generated subtitles: ai-zh, ai-en, etc.
+  if (normalized.includes(`.ai-${preferredPrimary}.`)) score += 70;
+  if (normalized.includes(`.ai-${preferred}.`)) score += 75;
   if (normalized.includes('.en.')) score += 30;
+  if (normalized.includes('.ai-en.')) score += 25;
   if (normalized.includes('.auto.')) score += 10;
 
   return score;
@@ -311,12 +320,117 @@ export class VideoTranscriptTool implements Tool {
       stripExtension(requestedName) || `transcript-${Date.now().toString(36)}`
     );
 
+    onProgress?.(10, 100, 'Fetching available subtitle tracks...');
+
+    // Attempt subtitle extraction — if cookies were provided, use them directly.
+    // Otherwise try without cookies first, then auto-retry with browser cookies
+    // if yt-dlp reports that authentication is required.
+    const effectiveCookies = cookiesFromBrowser;
+    const subtitleResult = await this.attemptSubtitleExtraction({
+      url,
+      language,
+      cookiesFromBrowser: effectiveCookies,
+      stem,
+      outputDir,
+      ytDlpRunner,
+    });
+
+    if (subtitleResult.subtitlePath) {
+      // Subtitles found on first attempt
+      return this.processSubtitleFile({
+        subtitlePath: subtitleResult.subtitlePath,
+        language,
+        includeTimestamps,
+        stem,
+        outputDir,
+        startTime,
+        onProgress,
+      });
+    }
+
+    // No subtitles found. If auth was hinted and no cookies were provided,
+    // auto-retry with detected browser cookies.
+    if (!effectiveCookies && subtitleResult.authRequired) {
+      onProgress?.(30, 100, 'Subtitles require authentication, retrying with browser cookies...');
+
+      const browserCandidates = ['chrome', 'edge', 'firefox', 'safari'];
+      for (const browser of browserCandidates) {
+        // Clean up any stale files from the previous attempt
+        await this.cleanSubtitleFiles(outputDir, stem);
+
+        const retryResult = await this.attemptSubtitleExtraction({
+          url,
+          language,
+          cookiesFromBrowser: browser,
+          stem,
+          outputDir,
+          ytDlpRunner,
+        });
+
+        if (retryResult.subtitlePath) {
+          return this.processSubtitleFile({
+            subtitlePath: retryResult.subtitlePath,
+            language,
+            includeTimestamps,
+            stem,
+            outputDir,
+            startTime,
+            onProgress,
+          });
+        }
+
+        // If this browser's cookies worked (no error) but still no subs, stop trying others
+        if (!retryResult.error) break;
+      }
+    }
+
+    // If the first attempt had a hard error (not auth-related), return it
+    if (subtitleResult.error && !subtitleResult.authRequired) {
+      return {
+        success: false,
+        output: '',
+        error: subtitleResult.error,
+        duration: Date.now() - startTime,
+      };
+    }
+
+    // No subtitle track found — fall back to Whisper speech-to-text
+    onProgress?.(60, 100, 'No subtitles found, falling back to Whisper transcription...');
+    return this.whisperFallback({
+      url,
+      language,
+      includeTimestamps,
+      cookiesFromBrowser: effectiveCookies,
+      stem,
+      outputDir,
+      startTime,
+      onProgress,
+      ytDlpRunner,
+    });
+  }
+
+  /**
+   * Run yt-dlp to download subtitle tracks for a video.
+   * Returns the resolved subtitle path (if any), whether auth was required,
+   * and any error message.
+   */
+  private async attemptSubtitleExtraction(opts: {
+    url: string;
+    language: string;
+    cookiesFromBrowser: string;
+    stem: string;
+    outputDir: string;
+    ytDlpRunner: YtDlpRunner;
+  }): Promise<{ subtitlePath: string | null; authRequired: boolean; error?: string }> {
+    const { url, language, cookiesFromBrowser, stem, outputDir, ytDlpRunner } = opts;
+
     const subtitleSelector = buildSubtitleLanguageSelector(language);
     const subtitleTemplate = path.join(outputDir, `${stem}.%(ext)s`);
     const subtitleArgs = [
       '--no-playlist',
       '--skip-download',
-      '--no-warnings',
+      // NOTE: do NOT use --no-warnings here — we need stderr warnings
+      // to detect auth requirements (e.g. Bilibili "logged in" hint).
       '--write-subs',
       '--write-auto-subs',
       '--sub-format',
@@ -331,64 +445,88 @@ export class VideoTranscriptTool implements Tool {
     }
     subtitleArgs.push(url);
 
-    onProgress?.(10, 100, 'Fetching available subtitle tracks...');
-
+    let stderr = '';
     try {
-      await runYtDlpCommand(this.execFileFn, ytDlpRunner, subtitleArgs, {
+      const result = await runYtDlpCommand(this.execFileFn, ytDlpRunner, subtitleArgs, {
         timeout: this.timeout,
         maxBuffer: 30 * 1024 * 1024,
       });
+      stderr = result.stderr || '';
     } catch (error: any) {
+      stderr = error?.stderr || '';
+      const isAuthHint = /logged in|login|authentication/i.test(stderr);
+      if (isAuthHint) {
+        return { subtitlePath: null, authRequired: true };
+      }
+      return {
+        subtitlePath: null,
+        authRequired: false,
+        error: error?.stderr || error?.message || 'Failed to fetch subtitles',
+      };
+    }
+
+    const subtitlePath = await resolveSubtitlePath(outputDir, stem, language);
+    const authRequired = !subtitlePath && /logged in|login|authentication/i.test(stderr);
+
+    return { subtitlePath, authRequired };
+  }
+
+  /**
+   * Read, parse, and return a transcript result from a resolved subtitle file.
+   */
+  private async processSubtitleFile(opts: {
+    subtitlePath: string;
+    language: string;
+    includeTimestamps: boolean;
+    stem: string;
+    outputDir: string;
+    startTime: number;
+    onProgress?: ProgressCallback;
+  }): Promise<ToolResult> {
+    const { subtitlePath, language, includeTimestamps, stem, outputDir, startTime, onProgress } = opts;
+
+    onProgress?.(55, 100, 'Parsing subtitle transcript...');
+    const subtitleContent = await fs.readFile(subtitlePath, 'utf8');
+    const segments = parseSubtitleSegments(subtitleContent);
+
+    if (segments.length === 0) {
       return {
         success: false,
         output: '',
-        error: error?.stderr || error?.message || 'Failed to fetch subtitles',
+        error: `Subtitle file was downloaded but no transcript content could be parsed: ${path.basename(subtitlePath)}`,
         duration: Date.now() - startTime,
       };
     }
 
-    onProgress?.(55, 100, 'Parsing subtitle transcript...');
-
-    const subtitlePath = await resolveSubtitlePath(outputDir, stem, language);
-
-    if (subtitlePath) {
-      const subtitleContent = await fs.readFile(subtitlePath, 'utf8');
-      const segments = parseSubtitleSegments(subtitleContent);
-
-      if (segments.length === 0) {
-        return {
-          success: false,
-          output: '',
-          error: `Subtitle file was downloaded but no transcript content could be parsed: ${path.basename(subtitlePath)}`,
-          duration: Date.now() - startTime,
-        };
-      }
-
-      return this.buildTranscriptResult({
-        segments,
-        source: path.basename(subtitlePath),
-        language,
-        includeTimestamps,
-        stem,
-        outputDir,
-        startTime,
-        onProgress,
-      });
-    }
-
-    // No subtitle track found — fall back to Whisper speech-to-text
-    onProgress?.(60, 100, 'No subtitles found, falling back to Whisper transcription...');
-    return this.whisperFallback({
-      url,
+    return this.buildTranscriptResult({
+      segments,
+      source: path.basename(subtitlePath),
       language,
       includeTimestamps,
-      cookiesFromBrowser,
       stem,
       outputDir,
       startTime,
       onProgress,
-      ytDlpRunner,
     });
+  }
+
+  /**
+   * Remove any subtitle files from a previous attempt for the given stem.
+   */
+  private async cleanSubtitleFiles(outputDir: string, stem: string): Promise<void> {
+    try {
+      const entries = await fs.readdir(outputDir);
+      for (const entry of entries) {
+        if (
+          entry.startsWith(`${stem}.`) &&
+          (entry.endsWith('.vtt') || entry.endsWith('.srt') || entry.endsWith('.ass'))
+        ) {
+          await fs.rm(path.join(outputDir, entry), { force: true }).catch(() => {});
+        }
+      }
+    } catch {
+      // Directory may not exist yet
+    }
   }
 
   private async buildTranscriptResult(opts: {
