@@ -667,6 +667,51 @@ describe('ReasoningTrace (Inspector)', () => {
     expect(durationColumn?.querySelector('svg')).toBeNull();
   });
 
+  it('shows elapsed timer for running orphan tool step using tool startedAt', () => {
+    const sessionId = 'session-running-orphan';
+    const now = Date.now();
+
+    useChatStore.setState({
+      messages: new Map([
+        [
+          sessionId,
+          [
+            {
+              id: 'assistant-running',
+              sessionId,
+              role: 'assistant',
+              content: 'working...',
+              createdAt: new Date(now),
+            },
+          ],
+        ],
+      ]),
+      reasoningSteps: new Map(),
+      toolCalls: new Map([
+        [
+          'run-1',
+          {
+            sessionId,
+            toolCallId: 'run-1',
+            toolName: 'video_transcript',
+            status: 'running',
+            startedAt: now - 4300,
+            params: { url: 'https://example.com/video' },
+          },
+        ],
+      ]),
+      isStreaming: true,
+      streamingSessionId: sessionId,
+    });
+
+    render(<ReasoningTrace sessionId={sessionId} />);
+    const toolStepButton = screen.getByRole('button', { name: /Step 1: Tool Step/i });
+    const durationColumn = toolStepButton.parentElement?.querySelector('.w-20') as HTMLElement | null;
+    expect(durationColumn).toBeTruthy();
+    expect(durationColumn?.textContent).toContain('s');
+    expect(durationColumn?.textContent).not.toContain('0.00s');
+  });
+
   it('ui e2e simulation keeps at most one running step through a full trace', () => {
     const sessionId = 'session-ui-e2e-linear';
     const traceId = 'trace-ui-linear';

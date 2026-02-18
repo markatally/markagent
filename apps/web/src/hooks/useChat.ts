@@ -243,6 +243,14 @@ export function useSessionMessages(sessionId: string | undefined) {
         if (result?.success === false) return 'failed';
         return 'completed';
       };
+      const toEpochMs = (value: unknown): number | undefined => {
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+        if (typeof value === 'string') {
+          const parsed = new Date(value).getTime();
+          if (Number.isFinite(parsed)) return parsed;
+        }
+        return undefined;
+      };
 
       const persistedToolCallsById = new Map<string, any>();
       // Newer API shape: session.toolCalls (flat list)
@@ -269,6 +277,8 @@ export function useSessionMessages(sessionId: string | undefined) {
         const result = toolCall?.result;
         const status = normalizeStatus(toolCall?.status, result);
         const messageId = toolCall?.messageId || toolCall?.message_id;
+        const startedAt = toEpochMs(toolCall?.startedAt ?? toolCall?.started_at);
+        const completedAt = toEpochMs(toolCall?.completedAt ?? toolCall?.completed_at);
 
         upsertToolCall({
           sessionId,
@@ -277,6 +287,8 @@ export function useSessionMessages(sessionId: string | undefined) {
           toolName,
           params,
           status,
+          startedAt,
+          completedAt,
           result: result?.success ? result : undefined,
           error: result?.success === false ? result?.error : undefined,
         });
@@ -442,7 +454,10 @@ export function useSessionMessages(sessionId: string | undefined) {
       // If the backend indicates an agent turn is still running, resume streaming state
       // so the UI shows a "reconnecting" indicator and SSE auto-reconnect can pick up.
       if ((session as any).taskRunning) {
-        startStreaming(sessionId);
+        const state = useChatStore.getState();
+        if (!(state.isStreaming && state.streamingSessionId === sessionId)) {
+          startStreaming(sessionId);
+        }
       }
 
       return messages;

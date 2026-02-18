@@ -611,7 +611,8 @@ export class TaskManager {
     context += `- When reporting release/publish time, prefer exact UTC timestamps. If unknown, state "publication time unknown" instead of guessing\n`;
     context += `- Do NOT explain internal tool limitations to the user\n`;
     if (state.goal.requiresVideoProbe || state.goal.requiresVideoDownload || state.goal.requiresTranscript) {
-      context += `- The user requested video processing; prioritize video tools (video_probe, video_download, video_transcript) over unrelated tools.\n`;
+      context += `- The user requested video processing; prioritize video_probe and video_transcript over unrelated tools.\n`;
+      context += `- Use video_download only when the user explicitly asks to download or save the video file.\n`;
       context += `- For transcript requests, return transcript text and artifacts from video_transcript output.\n`;
       context += `- Prefer includeTimestamps=true for better downstream evidence alignment.\n`;
       const isVideoSummaryRequest = this.SUMMARY_INTENT_PATTERN.test(state.goal.description);

@@ -258,7 +258,7 @@ export function DocumentRenderer({ sessionId }: DocumentRendererProps) {
           <ContentBlock content={streamingContent} isStreaming={true} />
         ) : null}
 
-        {isThinkingThisSession && !showStreamingContent ? (
+        {isStreamingThisSession && isThinkingThisSession && !showStreamingContent ? (
           <div className="text-muted-foreground">
             <ThinkingIndicator />
           </div>

@@ -85,4 +85,46 @@ test.describe('Video Summary Flow', () => {
 
     await page.screenshot({ path: join(outDir, 'video-summary-flow-end.png'), fullPage: true });
   });
+
+  test('follow-up question uses transcript context without file/shell tool errors', async ({
+    page,
+  }) => {
+    test.setTimeout(10 * 60 * 1000);
+    test.skip(!!process.env.CI, 'skip in CI due external video dependency');
+
+    await login(page);
+
+    const newChatBtn = page.locator('[data-testid="new-chat-button"]');
+    await newChatBtn.click();
+    await page.waitForURL(/\/chat\/[^/]+/, { timeout: 15000 });
+
+    const chatInput = page.locator('[data-testid="chat-input"]');
+    await expect(chatInput).toBeVisible({ timeout: 10000 });
+
+    await chatInput.fill(VIDEO_PROMPT);
+    await chatInput.press('Enter');
+
+    const sendBtn = page.getByRole('button', { name: /send message/i });
+    await expect(sendBtn).toBeVisible({ timeout: 420000 });
+
+    await chatInput.fill('将视频中的逐字稿总结成一篇文章');
+    await chatInput.press('Enter');
+
+    await openInspector(page);
+    await expect(sendBtn).toBeVisible({ timeout: 420000 });
+
+    const assistantMessages = page.locator('[data-testid="assistant-message"]');
+    await expect(assistantMessages.last()).toBeVisible({ timeout: 120000 });
+    const assistantText = ((await assistantMessages.last().textContent()) || '').trim();
+    expect(assistantText.length).toBeGreaterThan(80);
+
+    await expect(page.getByText(/Tool:\s*File Reader/i)).toHaveCount(0);
+    await expect(page.getByText(/Tool:\s*Shell Command/i)).toHaveCount(0);
+    await expect(page.getByText(/Sandbox unavailable/i)).toHaveCount(0);
+    await expect(page.getByText(/File not found/i)).toHaveCount(0);
+
+    const outDir = '/Users/mark/Git/markagent/output/playwright';
+    mkdirSync(outDir, { recursive: true });
+    await page.screenshot({ path: join(outDir, 'video-summary-followup-end.png'), fullPage: true });
+  });
 });

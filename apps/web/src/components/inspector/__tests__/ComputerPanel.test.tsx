@@ -701,4 +701,65 @@ describe('ComputerPanel', () => {
     const viewport = screen.getByTestId('browser-viewport-screenshot');
     expect(viewport).toHaveAttribute('src', oldShot);
   });
+
+  it('does not show stale standalone browser timeline while streaming with no run-scoped steps', () => {
+    const staleShot =
+      'data:image/svg+xml;charset=utf-8,' +
+      encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg"><text>stale-live</text></svg>');
+
+    useChatStore.setState({
+      isStreaming: true,
+      streamingSessionId: 'session-live-stale',
+      selectedMessageId: null,
+      browserSession: new Map([
+        [
+          'session-live-stale',
+          {
+            active: true,
+            currentUrl: 'https://example.com',
+            currentTitle: 'Example',
+            status: 'active',
+            actions: [
+              {
+                id: 'a-old',
+                type: 'navigate',
+                url: 'https://example.com',
+                timestamp: Date.now() - 1000,
+                screenshotDataUrl: staleShot,
+              },
+            ],
+            currentActionIndex: 0,
+          },
+        ],
+      ]),
+      agentRunStartIndex: new Map([['session-live-stale', 1]]),
+      agentSteps: new Map([
+        [
+          'session-live-stale',
+          {
+            currentStepIndex: 0,
+            steps: [
+              {
+                stepIndex: 0,
+                messageId: 'msg-old',
+                type: 'browse',
+                output: 'Old run step',
+                snapshot: {
+                  stepIndex: 0,
+                  timestamp: Date.now() - 2000,
+                  url: 'https://example.com',
+                  metadata: { actionDescription: 'Visit page' },
+                },
+              },
+            ],
+          },
+        ],
+      ]),
+    });
+
+    render(<ComputerPanel sessionId="session-live-stale" compact />);
+
+    expect(screen.getByTestId('computer-empty-state')).toBeInTheDocument();
+    expect(screen.queryByTestId('browser-viewport-screenshot')).not.toBeInTheDocument();
+  });
 });

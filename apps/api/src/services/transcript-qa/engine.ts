@@ -53,6 +53,39 @@ function buildVerifiedExtractiveFallback(
     return `- ${item.stamp} ${item.text.slice(0, 120)} [E${citeIndex}]`;
   });
   if (understanding.intent === 'summary') {
+    const wantsArticle =
+      /文章|长文|500字|五百字|essay|article|detailed/i.test(understanding.rawQuery);
+    if (wantsArticle) {
+      const cap = Math.min(evidence.length, 120);
+      const scoped = evidence.slice(0, cap);
+      const oneThird = Math.max(1, Math.floor(scoped.length / 3));
+      const twoThird = Math.max(2, Math.floor((scoped.length * 2) / 3));
+      const chunkText = (items: EvidenceItem[]) =>
+        items
+          .slice(0, 24)
+          .map((item) => item.text)
+          .join(' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      const opening = chunkText(scoped.slice(0, oneThird));
+      const middle = chunkText(scoped.slice(oneThird, twoThird));
+      const ending = chunkText(scoped.slice(twoThird));
+      return understanding.preferChinese
+        ? [
+            '根据完整 transcript，视频内容可概括为以下三个阶段：',
+            `开头部分主要围绕：${opening || '开场背景与主题引入。'}`,
+            `中段重点展开：${middle || '机制与实现细节说明。'}`,
+            `后段主要收束到：${ending || '实操与总结收尾。'}`,
+            '整体上，视频从概念解释逐步过渡到工作流程与工程落地，形成完整叙事。',
+          ].join('\n')
+        : [
+            'According to the full transcript, the video can be summarized in three stages:',
+            `Opening: ${opening || 'introduces the background and objective.'}`,
+            `Middle: ${middle || 'details the mechanisms and implementation flow.'}`,
+            `Ending: ${ending || 'focuses on practical execution and wrap-up.'}`,
+            'Overall, it progresses from concept explanation to workflow and engineering implementation.',
+          ].join('\n');
+    }
     const header = understanding.timeRange
       ? understanding.preferChinese
         ? '根据 transcript，这一段的重点如下：'

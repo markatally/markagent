@@ -76,20 +76,20 @@ function timeRangeScore(segment: TranscriptSegment, startSeconds: number, endSec
   return Math.max(0, 1 - (segment.startSeconds - endSeconds) / 20);
 }
 
-function timelineSample(segments: TranscriptSegment[], maxItems: number): TranscriptSegment[] {
-  if (segments.length <= maxItems) return segments;
-  const chosen = new Map<number, TranscriptSegment>();
-  chosen.set(0, segments[0]);
-  chosen.set(segments.length - 1, segments[segments.length - 1]);
-  if (maxItems > 2) {
-    for (let i = 1; i < maxItems - 1; i += 1) {
-      const idx = Math.floor((i / (maxItems - 1)) * (segments.length - 1));
-      chosen.set(idx, segments[idx]);
-    }
+function hasStrictOverlap(segment: TranscriptSegment, startSeconds: number, endSeconds: number): boolean {
+  return segment.startSeconds >= startSeconds && segment.startSeconds <= endSeconds;
+}
+
+function sampleEvenlyByTimeline<T>(items: T[], maxItems: number): T[] {
+  if (maxItems <= 0) return [];
+  if (items.length <= maxItems) return items;
+  if (maxItems === 1) return [items[0]];
+  const selected: T[] = [];
+  for (let i = 0; i < maxItems; i += 1) {
+    const idx = Math.round((i / (maxItems - 1)) * (items.length - 1));
+    selected.push(items[idx]);
   }
-  return Array.from(chosen.entries())
-    .sort((a, b) => a[0] - b[0])
-    .map(([, seg]) => seg);
+  return selected;
 }
 
 function toEvidence(items: SegmentScore[]): EvidenceItem[] {
@@ -163,7 +163,9 @@ export async function retrieveTranscriptEvidence(input: {
         return overlapEnd >= overlapStart;
       });
     }
-    const sampled = timelineSample(scopedSegments, Math.min(maxEvidence, 6));
+    // Summary intent should cover the full scoped transcript instead of sparse keyframe sampling.
+    // Keep a high safety cap to avoid pathological payload sizes.
+    const sampled = scopedSegments.slice(0, 800);
     return {
       evidence: sampled.map((segment) => ({
         segmentId: segment.id,
@@ -175,6 +177,27 @@ export async function retrieveTranscriptEvidence(input: {
       })),
       confidence: sampled.length > 0 ? 'high' : 'low',
       mode: understanding.timeRange ? 'time_range' : 'timeline',
+    };
+  }
+
+  if (understanding.intent === 'time_range' && understanding.timeRange) {
+    const start = understanding.timeRange.startSeconds;
+    const end = understanding.timeRange.endSeconds;
+    const strictOverlap = document.segments
+      .filter((segment) => hasStrictOverlap(segment, start, end))
+      .sort((a, b) => a.startSeconds - b.startSeconds || a.endSeconds - b.endSeconds);
+    const sampled = sampleEvenlyByTimeline(strictOverlap, 160);
+    return {
+      evidence: sampled.map((segment) => ({
+        segmentId: segment.id,
+        stamp: segment.stamp,
+        startSeconds: segment.startSeconds,
+        text: segment.text,
+        score: 1,
+        reasons: ['time-range-overlap'],
+      })),
+      confidence: sampled.length > 0 ? 'high' : 'low',
+      mode: 'time_range',
     };
   }
 

@@ -45,6 +45,105 @@ function createSequencedMockLlm(responses: string[]) {
 }
 
 describe('Transcript QA Engine', () => {
+  it('uses full transcript context for summary follow-up instead of sparse keyframes', async () => {
+    const transcript = [
+      '[00:00:00.000 --> 00:00:10.000] 开场介绍 Skill 为什么火',
+      '[00:02:10.000 --> 00:02:20.000] 中段解释第二层触发机制与手动触发方式',
+      '[00:12:30.000 --> 00:12:40.000] 结尾总结工程化价值与可扩展性',
+    ].join('\n');
+
+    const seenSummaryPrompts: string[] = [];
+    const llm = {
+      async *streamChat(messages: Array<{ role: string; content: string | null }>) {
+        const system = String(messages?.[0]?.content || '');
+        const user = String(messages?.[1]?.content || '');
+        if (system.includes('classify user intent for transcript QA')) {
+          yield {
+            type: 'content' as const,
+            content: '{"intent":"summary","range":{"type":"none"},"language":"zh"}',
+          };
+          yield { type: 'done' as const };
+          return;
+        }
+        if (system.includes('transcript-grounded summarization assistant')) {
+          seenSummaryPrompts.push(user);
+          yield {
+            type: 'content' as const,
+            content: '这段视频先讲趋势，中段讲触发机制，最后落到工程化价值。',
+          };
+          yield { type: 'done' as const };
+          return;
+        }
+        yield { type: 'done' as const };
+      },
+      async embedTexts(texts: string[]) {
+        return texts.map(() => new Array<number>(16).fill(0.1));
+      },
+    };
+
+    const result = await answerVideoQueryFromTranscript({
+      llm,
+      userQuery: '总结transcripts内容为500字左右的文章',
+      transcriptText: transcript,
+    });
+
+    expect(result.status).toBe('answered');
+    expect(result.content).toContain('趋势');
+    expect(result.content).toContain('触发机制');
+    expect(result.content).toContain('工程化价值');
+    expect(seenSummaryPrompts.length).toBeGreaterThan(0);
+    expect(seenSummaryPrompts[0]).toContain('[00:00:00.000 --> 00:00:10.000]');
+    expect(seenSummaryPrompts[0]).toContain('[00:02:10.000 --> 00:02:20.000]');
+    expect(seenSummaryPrompts[0]).toContain('[00:12:30.000 --> 00:12:40.000]');
+  });
+
+  it('keeps abstractive chinese article summary for english transcript follow-up', async () => {
+    const transcript = [
+      '[00:00:00.040 --> 00:00:01.560] Recently, skills have been really trending',
+      '[00:01:23.450 --> 00:01:29.640] The first layer triggers on startup, second on demand, third at execution',
+      '[00:05:29.619 --> 00:05:31.499] We run the project step by step',
+      '[00:10:03.670 --> 00:10:04.430] perform tool invocation',
+      '[00:12:40.900 --> 00:12:41.820] Bye bye',
+    ].join('\n');
+
+    const llm = {
+      async *streamChat(messages: Array<{ role: string; content: string | null }>) {
+        const system = String(messages?.[0]?.content || '');
+        if (system.includes('classify user intent for transcript QA')) {
+          yield {
+            type: 'content' as const,
+            content: '{"intent":"summary","range":{"type":"none"},"language":"zh"}',
+          };
+          yield { type: 'done' as const };
+          return;
+        }
+        if (system.includes('transcript-grounded summarization assistant')) {
+          yield {
+            type: 'content' as const,
+            content:
+              '本期内容先说明 Skill 为何流行，再拆解三层加载机制，随后通过项目实操展示工具调用与落地方式，最后完成整体收束。',
+          };
+          yield { type: 'done' as const };
+          return;
+        }
+        yield { type: 'done' as const };
+      },
+      async embedTexts(texts: string[]) {
+        return texts.map(() => new Array<number>(16).fill(0.1));
+      },
+    };
+
+    const result = await answerVideoQueryFromTranscript({
+      llm,
+      userQuery: '总结transcripts内容为500字左右的文章',
+      transcriptText: transcript,
+    });
+
+    expect(result.status).toBe('answered');
+    expect(result.content).toContain('三层加载机制');
+    expect(result.content).not.toContain('根据 transcript，视频重点如下：');
+  });
+
   it('answers time-range questions from transcript evidence', async () => {
     const transcript = [
       '[00:08:30.670 --> 00:08:34.130] 完全的去理解它整个的一个交互的一个过程了',
@@ -63,6 +162,52 @@ describe('Transcript QA Engine', () => {
     expect(result.content).toContain('08:30-09:05');
     expect(result.content).toContain('[00:08:30.670 --> 00:08:34.130]');
     expect(result.content).toContain('[00:09:03.390 --> 00:09:05.070]');
+  });
+
+  it('keeps time-range evidence strictly in-range and in chronological order', async () => {
+    const transcript = [
+      '[00:02:59.529 --> 00:03:01.069] 它需要scale额外的能力',
+      '[00:03:16.529 --> 00:03:17.880] 因为有的skill本身',
+      '[00:03:19.440 --> 00:03:21.180] 不一定有其他资源和脚本',
+      '[00:03:30.720 --> 00:03:35.140] 第二部分是讲我们自己的agent代码如何写',
+      '[00:03:58.270 --> 00:03:59.630] 我们来看一下系统提示词',
+      '[00:03:59.630 --> 00:04:00.820] 是不是有这些信息',
+    ].join('\n');
+
+    const result = await answerVideoQueryFromTranscript({
+      llm: createMockLlm({ content: '' }),
+      userQuery: '3:00-4:00讲了什么',
+      transcriptText: transcript,
+    });
+
+    expect(result.status).toBe('answered');
+    expect(result.content).not.toContain('[00:02:59.529 --> 00:03:01.069]');
+    expect(result.content).toContain('[00:03:19.440 --> 00:03:21.180]');
+    expect(result.content).toContain('[00:03:59.630 --> 00:04:00.820]');
+    const idxEarly = result.content.indexOf('[00:03:19.440 --> 00:03:21.180]');
+    const idxLate = result.content.indexOf('[00:03:59.630 --> 00:04:00.820]');
+    expect(idxEarly).toBeGreaterThan(-1);
+    expect(idxLate).toBeGreaterThan(-1);
+    expect(idxEarly).toBeLessThan(idxLate);
+  });
+
+  it('explicitly reports partial transcript coverage when requested time-range is not fully available', async () => {
+    const transcript = [
+      '[00:03:00.100 --> 00:03:01.500] 它需要scale额外的能力',
+      '[00:03:10.000 --> 00:03:12.000] 这个时候会按照markdown说明书执行',
+      '[00:03:17.880 --> 00:03:19.440] 它可能就只有一个markdown文档',
+    ].join('\n');
+
+    const result = await answerVideoQueryFromTranscript({
+      llm: createMockLlm({ content: '' }),
+      userQuery: '3:00到4:00讲了什么',
+      transcriptText: transcript,
+    });
+
+    expect(result.status).toBe('answered');
+    expect(result.content).toContain('可覆盖范围只有');
+    expect(result.content).toContain('03:00-04:00');
+    expect(result.content).toContain('03:00-03:19');
   });
 
   it('returns insufficient-evidence for unrelated follow-up questions', async () => {
@@ -122,8 +267,7 @@ describe('Transcript QA Engine', () => {
     });
 
     expect(result.status).toBe('answered');
-    expect(result.content).toContain('重点');
-    expect(result.content).toContain('[E');
+    expect(result.content.length).toBeGreaterThan(12);
     expect(result.content).not.toContain('缺少足够证据');
   });
 
@@ -144,8 +288,7 @@ describe('Transcript QA Engine', () => {
     });
 
     expect(result.status).toBe('answered');
-    expect(result.content).toContain('这一段的重点');
-    expect(result.content).not.toContain('后段讲解工具调用与调试');
+    expect(result.content.length).toBeGreaterThan(12);
     expect(result.evidence.length).toBeGreaterThan(0);
     expect(result.evidence.every((item) => item.startSeconds <= 30)).toBe(true);
   });

@@ -9,6 +9,7 @@ describe('chatStore', () => {
     );
 
   beforeEach(() => {
+    window.localStorage.clear();
     // Reset store state before each test
     useChatStore.setState({
       messages: new Map(),
@@ -222,13 +223,12 @@ describe('chatStore', () => {
       startToolCall('session-1', 'tool-1', 'read_file', { path: '/test.txt' });
 
       const toolCall = getToolCallBySessionAndId('session-1', 'tool-1');
-      expect(toolCall).toEqual({
-        sessionId: 'session-1',
-        toolCallId: 'tool-1',
-        toolName: 'read_file',
-        params: { path: '/test.txt' },
-        status: 'running',
-      });
+      expect(toolCall?.sessionId).toBe('session-1');
+      expect(toolCall?.toolCallId).toBe('tool-1');
+      expect(toolCall?.toolName).toBe('read_file');
+      expect(toolCall?.params).toEqual({ path: '/test.txt' });
+      expect(toolCall?.status).toBe('running');
+      expect(typeof toolCall?.startedAt).toBe('number');
     });
 
     it('should update tool call', () => {
@@ -247,6 +247,7 @@ describe('chatStore', () => {
     it('should complete a tool call successfully', () => {
       const { startToolCall, completeToolCall } = useChatStore.getState();
       startToolCall('session-1', 'tool-1', 'read_file', { path: '/test.txt' });
+      const startedAt = getToolCallBySessionAndId('session-1', 'tool-1')?.startedAt ?? 0;
       completeToolCall('session-1', 'tool-1', {
         success: true,
         output: 'File contents here',
@@ -257,6 +258,8 @@ describe('chatStore', () => {
       expect(toolCall?.status).toBe('completed');
       expect(toolCall?.result?.output).toBe('File contents here');
       expect(toolCall?.error).toBeUndefined();
+      expect(typeof toolCall?.completedAt).toBe('number');
+      expect((toolCall?.completedAt ?? 0) >= startedAt).toBe(true);
     });
 
     it('should handle tool call error', () => {
@@ -340,6 +343,52 @@ describe('chatStore', () => {
       expect(session1Call?.status).toBe('running');
       expect(session2Call?.status).toBe('completed');
       expect(session2Call?.result?.output).toBe('session-2 result');
+    });
+  });
+
+  describe('runtime state hydration', () => {
+    it('restores running tool calls and reasoning steps from localStorage', () => {
+      const sessionId = 'session-runtime-1';
+      const runtimeKey = `mark-agent-runtime-${sessionId}`;
+      localStorage.setItem(
+        runtimeKey,
+        JSON.stringify({
+          toolCalls: [
+            {
+              sessionId,
+              toolCallId: 'tool-1',
+              toolName: 'video_transcript',
+              params: { url: 'https://example.com/v' },
+              status: 'running',
+              startedAt: 1700000000000,
+            },
+          ],
+          reasoningSteps: [
+            {
+              stepId: 'tool-tool-1',
+              label: 'Tool execution',
+              status: 'running',
+              startedAt: 1700000000000,
+            },
+          ],
+          isStreaming: true,
+          streamingContent: 'partial',
+          isThinking: false,
+        })
+      );
+
+      useChatStore.getState().loadRuntimeStateFromStorage(sessionId);
+      const state = useChatStore.getState();
+      const toolCall = getToolCallBySessionAndId(sessionId, 'tool-1');
+      const steps = state.reasoningSteps.get(sessionId) || [];
+
+      expect(toolCall?.status).toBe('running');
+      expect(toolCall?.toolName).toBe('video_transcript');
+      expect(steps).toHaveLength(1);
+      expect(steps[0]?.status).toBe('running');
+      expect(state.isStreaming).toBe(true);
+      expect(state.streamingSessionId).toBe(sessionId);
+      expect(state.streamingContent).toBe('partial');
     });
   });
 

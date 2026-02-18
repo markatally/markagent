@@ -19,6 +19,8 @@ interface ToolCallStatus {
   toolCallId: string;
   toolName: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
+  startedAt?: number;
+  completedAt?: number;
   params: any;
   result?: ToolResult;
   error?: string;
@@ -329,6 +331,16 @@ function createToolTimelineStep(
   toolCalls: ToolCallStatus[],
   fallbackId: string
 ): TimelineStep {
+  const minToolStartedAt = toolCalls.reduce<number | undefined>((minTs, call) => {
+    if (typeof call.startedAt !== 'number') return minTs;
+    if (typeof minTs !== 'number') return call.startedAt;
+    return Math.min(minTs, call.startedAt);
+  }, undefined);
+  const maxToolCompletedAt = toolCalls.reduce<number | undefined>((maxTs, call) => {
+    if (typeof call.completedAt !== 'number') return maxTs;
+    if (typeof maxTs !== 'number') return call.completedAt;
+    return Math.max(maxTs, call.completedAt);
+  }, undefined);
   const queries = Array.from(
     new Set(toolCalls.flatMap((toolCall) => getToolQueries(toolCall)).filter(Boolean))
   );
@@ -352,9 +364,13 @@ function createToolTimelineStep(
     // If a reasoning step exists, it is the source-of-truth for lifecycle.
     // Tool call status is only used for orphan tool rows without reasoning-step context.
     status: statusFromReasoningStep ?? getToolStepStatus(toolCalls, 'completed'),
-    startedAt: step?.startedAt,
-    completedAt: step?.completedAt,
-    durationMs: step?.durationMs ?? fallbackDuration,
+    startedAt: step?.startedAt ?? minToolStartedAt,
+    completedAt: step?.completedAt ?? maxToolCompletedAt,
+    durationMs:
+      step?.durationMs ??
+      (typeof minToolStartedAt === 'number' && typeof maxToolCompletedAt === 'number'
+        ? Math.max(0, maxToolCompletedAt - minToolStartedAt)
+        : fallbackDuration),
     message: step?.message,
     thinkingContent: step?.thinkingContent,
     toolCalls,

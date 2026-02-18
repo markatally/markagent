@@ -113,6 +113,26 @@ export interface AppConfig {
 
 let cachedConfig: AppConfig | null = null;
 
+function resolveConfigPath(rawPath: string): string {
+  const candidates: string[] = [];
+  if (path.isAbsolute(rawPath)) {
+    candidates.push(rawPath);
+  } else {
+    candidates.push(path.resolve(process.cwd(), rawPath));
+    // Also resolve relative to repository root for monorepo/dev-server cwd drift.
+    candidates.push(path.resolve(__dirname, '../../../../', rawPath));
+    candidates.push(rawPath);
+  }
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+      return candidate;
+    }
+  }
+
+  return candidates[0] || rawPath;
+}
+
 /**
  * Load application configuration from JSON file with environment overrides
  */
@@ -121,7 +141,8 @@ export function loadConfig(): AppConfig {
     return cachedConfig;
   }
 
-  const configPath = process.env.CONFIG_PATH || DEFAULT_CONFIG_PATH;
+  const requestedPath = process.env.CONFIG_PATH || DEFAULT_CONFIG_PATH;
+  const configPath = resolveConfigPath(requestedPath);
 
   let config: AppConfig;
 
@@ -129,8 +150,8 @@ export function loadConfig(): AppConfig {
     const configFile = fs.readFileSync(configPath, 'utf-8');
     config = JSON.parse(configFile) as AppConfig;
   } catch (error) {
-    console.error(`Failed to load config from ${configPath}:`, error);
-    throw new Error(`Configuration file not found or invalid: ${configPath}`);
+    console.error(`Failed to load config from ${configPath} (requested: ${requestedPath}):`, error);
+    throw new Error(`Configuration file not found or invalid: ${requestedPath}`);
   }
 
   // Override with environment variables if present

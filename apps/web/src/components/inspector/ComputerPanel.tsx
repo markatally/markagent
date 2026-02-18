@@ -386,8 +386,10 @@ export function ComputerPanel({ sessionId, compact = false }: ComputerPanelProps
   const isAtLatestAgentStep = agentSteps.length === 0 || agentCurrentIndex >= agentSteps.length - 1;
 
   const hasAgentTimeline = agentSteps.length > 0;
+  // During a live turn, only show run-scoped agent timeline.
+  // Avoid falling back to stale standalone browser actions from prior turns.
   const allowStandaloneBrowserTimeline =
-    isSessionStreaming || (!scopeMessageId && browserActions.length > 0);
+    !isSessionStreaming && !scopeMessageId && browserActions.length > 0;
   const hasReplayTimeline =
     hasAgentTimeline || (allowStandaloneBrowserTimeline && browserActions.length > 0);
   const stackedContainerClass = compact ? 'space-y-3 pr-1' : 'space-y-4';

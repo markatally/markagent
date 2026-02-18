@@ -26,6 +26,8 @@ interface ToolCallStatus {
   toolName: string;
   params: any;
   status: 'pending' | 'running' | 'completed' | 'failed';
+  startedAt?: number;
+  completedAt?: number;
   result?: ToolResult;
   error?: string;
   progress?: {
@@ -142,6 +144,7 @@ interface PptPipelineState {
 const SIDEBAR_OPEN_STORAGE_KEY = 'sidebar-open';
 const EXECUTION_MODE_STORAGE_KEY = 'execution-mode';
 const COMPUTER_STATE_PREFIX = 'mark-agent-computer-';
+const RUNTIME_STATE_PREFIX = 'mark-agent-runtime-';
 const LEGACY_RECONSTRUCTED_SNAPSHOT_MARKER = 'Snapshot unavailable (reconstructed from history)';
 
 function getToolCallStoreKey(sessionId: string, toolCallId: string): string {
@@ -449,6 +452,7 @@ interface ChatState {
   associateAgentStepsWithMessage: (sessionId: string, messageId: string) => void;
   clearAgentSteps: (sessionId: string) => void;
   loadComputerStateFromStorage: (sessionId: string) => void;
+  loadRuntimeStateFromStorage: (sessionId: string) => void;
 }
 
 function persistComputerState(get: () => ChatState, sessionId: string) {
@@ -462,6 +466,25 @@ function persistComputerState(get: () => ChatState, sessionId: string) {
       agentSteps: state.agentSteps.get(sessionId) ?? null,
     };
     localStorage.setItem(COMPUTER_STATE_PREFIX + sessionId, JSON.stringify(data));
+  } catch (_) {
+    /* ignore quota / parse */
+  }
+}
+
+function persistRuntimeState(get: () => ChatState, sessionId: string) {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    const state = get();
+    const data = {
+      toolCalls: Array.from(state.toolCalls.values()).filter((call) => call.sessionId === sessionId),
+      reasoningSteps: state.reasoningSteps.get(sessionId) ?? [],
+      isStreaming: state.isStreaming && state.streamingSessionId === sessionId,
+      streamingContent:
+        state.isStreaming && state.streamingSessionId === sessionId ? state.streamingContent : '',
+      isThinking: state.isStreaming && state.streamingSessionId === sessionId ? state.isThinking : false,
+      updatedAt: Date.now(),
+    };
+    localStorage.setItem(RUNTIME_STATE_PREFIX + sessionId, JSON.stringify(data));
   } catch (_) {
     /* ignore quota / parse */
   }
@@ -502,17 +525,79 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   // Comprehensive session-scoped state reset for session switches
   resetForSession: (sessionId: string) => {
-    const state = get();
-    // Clear session-scoped transient state
-    state.clearToolCalls(sessionId);
-    state.clearReasoningSteps(sessionId);
-    state.clearFiles(sessionId);
-    state.clearTables();
-    state.clearPptPipeline(sessionId);
-    state.clearBrowserSession(sessionId);
-    state.clearExecutionState(sessionId);
-    state.clearAgentSteps(sessionId);
-    set({ selectedMessageId: null });
+    set((state) => {
+      const toolCalls = new Map(state.toolCalls);
+      for (const [toolCallId, toolCall] of toolCalls.entries()) {
+        if (toolCall.sessionId === sessionId) {
+          toolCalls.delete(toolCallId);
+        }
+      }
+
+      const reasoningSteps = new Map(state.reasoningSteps);
+      const reasoningActiveStepId = new Map(state.reasoningActiveStepId);
+      const reasoningLastStepIndex = new Map(state.reasoningLastStepIndex);
+      const reasoningSeenEventIds = new Map(state.reasoningSeenEventIds);
+      const reasoningPendingEvents = new Map(state.reasoningPendingEvents);
+      const reasoningLateEventLog = new Map(state.reasoningLateEventLog);
+      const reasoningLastTimestamp = new Map(state.reasoningLastTimestamp);
+      reasoningSteps.delete(sessionId);
+      reasoningActiveStepId.delete(sessionId);
+      reasoningLastStepIndex.delete(sessionId);
+      reasoningSeenEventIds.delete(sessionId);
+      reasoningPendingEvents.delete(sessionId);
+      reasoningLateEventLog.delete(sessionId);
+      reasoningLastTimestamp.delete(sessionId);
+
+      const files = new Map(state.files);
+      files.delete(sessionId);
+
+      const pptPipeline = new Map(state.pptPipeline);
+      pptPipeline.delete(sessionId);
+
+      const isPptTask = new Map(state.isPptTask);
+      isPptTask.delete(sessionId);
+
+      const browserSession = new Map(state.browserSession);
+      browserSession.delete(sessionId);
+
+      const terminalLines = new Map(state.terminalLines);
+      terminalLines.delete(sessionId);
+
+      const executionSteps = new Map(state.executionSteps);
+      executionSteps.delete(sessionId);
+
+      const sandboxFiles = new Map(state.sandboxFiles);
+      sandboxFiles.delete(sessionId);
+
+      const agentSteps = new Map(state.agentSteps);
+      agentSteps.delete(sessionId);
+
+      const agentRunStartIndex = new Map(state.agentRunStartIndex);
+      agentRunStartIndex.delete(sessionId);
+
+      return {
+        toolCalls,
+        reasoningSteps,
+        reasoningActiveStepId,
+        reasoningLastStepIndex,
+        reasoningSeenEventIds,
+        reasoningPendingEvents,
+        reasoningLateEventLog,
+        reasoningLastTimestamp,
+        files,
+        streamingTables: new Map(),
+        completedTables: new Map(),
+        pptPipeline,
+        isPptTask,
+        browserSession,
+        terminalLines,
+        executionSteps,
+        sandboxFiles,
+        agentSteps,
+        agentRunStartIndex,
+        selectedMessageId: null,
+      };
+    });
   },
 
   // Only stop streaming if it belongs to the specified session
@@ -573,6 +658,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       isThinking: true, // Thinking until first token arrives
       selectedMessageId: null, // Clear message selection so inspector shows live data
     });
+    persistRuntimeState(get, sessionId);
   },
 
   // Append content to streaming message
@@ -581,6 +667,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       streamingContent: state.streamingContent + content,
       isThinking: false, // First token arrived, no longer thinking
     }));
+    const activeSessionId = get().streamingSessionId;
+    if (activeSessionId) {
+      persistRuntimeState(get, activeSessionId);
+    }
   },
 
   // Finalize streaming message
@@ -597,36 +687,54 @@ export const useChatStore = create<ChatState>((set, get) => ({
       isStreaming: false,
       isThinking: false,
     });
+    if (streamingSessionId) {
+      persistRuntimeState(get, streamingSessionId);
+    }
   },
 
   // Stop streaming
   stopStreaming: () => {
+    const activeSessionId = get().streamingSessionId;
     set({
       streamingSessionId: null,
       streamingContent: '',
       isStreaming: false,
       isThinking: false,
     });
+    if (activeSessionId) {
+      persistRuntimeState(get, activeSessionId);
+    }
   },
 
   // Set thinking state (used for multi-step tool execution)
   setThinking: (isThinking: boolean) => {
     set({ isThinking });
+    const activeSessionId = get().streamingSessionId;
+    if (activeSessionId) {
+      persistRuntimeState(get, activeSessionId);
+    }
   },
 
   // Start a tool call
   startToolCall: (sessionId: string, toolCallId: string, toolName: string, params: any) => {
     set((state) => {
       const newToolCalls = new Map(state.toolCalls);
+      const existing = newToolCalls.get(getToolCallStoreKey(sessionId, toolCallId));
       newToolCalls.set(getToolCallStoreKey(sessionId, toolCallId), {
+        ...existing,
         sessionId,
+        messageId: existing?.messageId,
         toolCallId,
         toolName,
         params,
         status: 'running',
+        startedAt: existing?.startedAt ?? Date.now(),
+        completedAt: undefined,
+        error: undefined,
       });
       return { toolCalls: newToolCalls };
     });
+    persistRuntimeState(get, sessionId);
   },
 
   // Upsert a tool call (used for persisted hydration and safe refresh behavior)
@@ -635,12 +743,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const newToolCalls = new Map(state.toolCalls);
       const storeKey = getToolCallStoreKey(toolCall.sessionId, toolCall.toolCallId);
       const existing = newToolCalls.get(storeKey);
+      const mergedStartedAt =
+        toolCall.startedAt ??
+        existing?.startedAt ??
+        (toolCall.status === 'running' ? Date.now() : undefined);
+      const mergedCompletedAt =
+        toolCall.completedAt ??
+        existing?.completedAt ??
+        (toolCall.status === 'completed' || toolCall.status === 'failed' ? Date.now() : undefined);
       newToolCalls.set(
         storeKey,
-        existing ? { ...existing, ...toolCall } : toolCall
+        existing
+          ? { ...existing, ...toolCall, startedAt: mergedStartedAt, completedAt: mergedCompletedAt }
+          : { ...toolCall, startedAt: mergedStartedAt, completedAt: mergedCompletedAt }
       );
       return { toolCalls: newToolCalls };
     });
+    persistRuntimeState(get, toolCall.sessionId);
   },
 
   // Update a tool call
@@ -649,13 +768,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const newToolCalls = new Map(state.toolCalls);
       const existing = newToolCalls.get(getToolCallStoreKey(sessionId, toolCallId));
       if (existing) {
+        const nextStatus = updates.status ?? existing.status;
         newToolCalls.set(getToolCallStoreKey(sessionId, toolCallId), {
           ...existing,
           ...updates,
+          startedAt:
+            updates.startedAt ??
+            existing.startedAt ??
+            (nextStatus === 'running' ? Date.now() : undefined),
+          completedAt:
+            updates.completedAt ??
+            existing.completedAt ??
+            (nextStatus === 'completed' || nextStatus === 'failed' ? Date.now() : undefined),
         });
       }
       return { toolCalls: newToolCalls };
     });
+    persistRuntimeState(get, sessionId);
   },
 
   // Update tool call progress
@@ -677,6 +806,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
       return { toolCalls: newToolCalls };
     });
+    persistRuntimeState(get, sessionId);
   },
 
   // Complete a tool call
@@ -685,15 +815,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const newToolCalls = new Map(state.toolCalls);
       const existing = newToolCalls.get(getToolCallStoreKey(sessionId, toolCallId));
       if (existing) {
+        const now = Date.now();
+        const startedAt =
+          existing.startedAt ??
+          (typeof result.duration === 'number' && result.duration >= 0 ? now - result.duration : now);
         newToolCalls.set(getToolCallStoreKey(sessionId, toolCallId), {
           ...existing,
           status: result.success ? 'completed' : 'failed',
+          startedAt,
+          completedAt: now,
           result: result.success ? result : undefined,
           error: result.success ? undefined : result.error,
         });
       }
       return { toolCalls: newToolCalls };
     });
+    persistRuntimeState(get, sessionId);
   },
 
   // Associate tool calls with a completed assistant message
@@ -707,6 +844,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
       return { toolCalls: newToolCalls };
     });
+    persistRuntimeState(get, sessionId);
   },
 
   // Clear all tool calls
@@ -725,6 +863,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
       return { toolCalls: newToolCalls };
     });
+    persistRuntimeState(get, sessionId);
   },
 
   // Add a reasoning step
@@ -978,6 +1117,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         reasoningLastTimestamp: newLastTimestamp,
       };
     });
+    persistRuntimeState(get, sessionId);
   },
 
   finalizeReasoningTrace: (sessionId: string, completedAt?: number) => {
@@ -1054,6 +1194,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         reasoningLastStepIndex: newLastStepIndex,
       };
     });
+    persistRuntimeState(get, sessionId);
   },
 
   // Clear reasoning steps
@@ -1096,6 +1237,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         reasoningLastTimestamp: newLastTimestamp,
       };
     });
+    persistRuntimeState(get, sessionId);
   },
 
   // Add a file artifact
@@ -1642,6 +1784,52 @@ export const useChatStore = create<ChatState>((set, get) => ({
           agentSteps.set(sessionId, sanitizePersistedAgentSteps(data.agentSteps));
           next.agentSteps = agentSteps;
         }
+        return next;
+      });
+    } catch (_) {
+      /* ignore */
+    }
+  },
+
+  loadRuntimeStateFromStorage: (sessionId: string) => {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const raw = localStorage.getItem(RUNTIME_STATE_PREFIX + sessionId);
+      if (!raw) return;
+      const data = JSON.parse(raw) as {
+        toolCalls?: ToolCallStatus[];
+        reasoningSteps?: ReasoningStep[];
+        isStreaming?: boolean;
+        streamingContent?: string;
+        isThinking?: boolean;
+      };
+
+      set((state) => {
+        const next: Partial<ChatState> = {};
+
+        if (Array.isArray(data.toolCalls) && data.toolCalls.length > 0) {
+          const toolCalls = new Map(state.toolCalls);
+          for (const toolCall of data.toolCalls) {
+            if (!toolCall?.toolCallId || toolCall.sessionId !== sessionId) continue;
+            toolCalls.set(getToolCallStoreKey(sessionId, toolCall.toolCallId), toolCall);
+          }
+          next.toolCalls = toolCalls;
+        }
+
+        if (Array.isArray(data.reasoningSteps) && data.reasoningSteps.length > 0) {
+          const reasoningSteps = new Map(state.reasoningSteps);
+          reasoningSteps.set(sessionId, data.reasoningSteps);
+          next.reasoningSteps = reasoningSteps;
+        }
+
+        if (data.isStreaming) {
+          next.streamingSessionId = sessionId;
+          next.isStreaming = true;
+          next.streamingContent = typeof data.streamingContent === 'string' ? data.streamingContent : '';
+          next.isThinking = Boolean(data.isThinking);
+          next.selectedMessageId = null;
+        }
+
         return next;
       });
     } catch (_) {

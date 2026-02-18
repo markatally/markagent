@@ -229,4 +229,30 @@ describe('DocumentRenderer artifacts', () => {
 
     expect(screen.queryByText('video-probe.json')).not.toBeInTheDocument();
   });
+
+  it('does not render thinking indicator when stream is already complete', () => {
+    vi.mocked(useSessionMessages).mockReturnValue({
+      data: [
+        {
+          id: 'assistant-done',
+          sessionId: 'session-1',
+          role: 'assistant',
+          content: 'All done.',
+          createdAt: new Date(),
+        },
+      ],
+      isLoading: false,
+      error: null,
+    } as any);
+
+    useChatStore.setState({
+      isStreaming: false,
+      isThinking: true,
+      streamingSessionId: 'session-1',
+    });
+
+    render(<DocumentRenderer sessionId="session-1" />);
+
+    expect(screen.queryByText('thinking...')).not.toBeInTheDocument();
+  });
 });

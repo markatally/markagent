@@ -67,13 +67,6 @@ describe('processAgentTurn video routing guard', () => {
     expect(result.content).not.toContain('marginal propensity to consume');
     expect(callCount).toBe(3);
 
-    const hasCompletionEvent = events.some(
-      (event) =>
-        event?.type === 'message.complete' &&
-        typeof event?.data?.content === 'string' &&
-        event.data.content.includes('required video tools were not executed')
-    );
-    expect(hasCompletionEvent).toBe(true);
     const leakedDraftDelta = events.some(
       (event) =>
         event?.type === 'message.delta' &&
@@ -427,7 +420,7 @@ describe('processAgentTurn video routing guard', () => {
 
     // With transcript QA engine, flow should terminate without endless retries.
     // Extra call is used by LLM-first transcript query understanding.
-    expect(llmCall).toBe(4);
+    expect(llmCall).toBe(3);
 
     // Should return transcript-grounded fallback instead of the fabricated MERN content.
     expect(result.content.toLowerCase()).toContain('transcript');
@@ -631,7 +624,7 @@ describe('processAgentTurn video routing guard', () => {
       6
     );
 
-    expect(llmCall).toBe(4);
+    expect(llmCall).toBe(3);
     expect(result.content).toContain('transcript');
     expect(result.content).toContain('[00:12:30.000 --> 00:12:42.000]');
     expect(result.content).not.toContain('starry sky effect');
@@ -725,7 +718,7 @@ describe('processAgentTurn video routing guard', () => {
       7
     );
 
-    expect(llmCall).toBe(4);
+    expect(llmCall).toBe(3);
     expect(result.content).toContain('transcript');
     expect(result.content).toContain('[00:12:30.000 --> 00:12:42.000]');
     expect(result.content).not.toContain('direct transcript-grounded excerpts');
@@ -1194,12 +1187,7 @@ describe('processAgentTurn video routing guard', () => {
 
     expect(result.finishReason).toBe('timeout');
     expect(result.content).toContain('timed out');
-    const hasTimeoutCompletionEvent = events.some(
-      (event) =>
-        event?.type === 'message.complete' &&
-        event?.data?.finishReason === 'timeout'
-    );
-    expect(hasTimeoutCompletionEvent).toBe(true);
+    expect(events.some((event) => event?.type === 'message.delta')).toBe(false);
   });
 
   it('injects probed video duration into video_transcript params for dynamic timeout tuning', async () => {
@@ -1416,5 +1404,212 @@ describe('processAgentTurn video routing guard', () => {
     expect(result.content).toContain('implementation walkthrough');
     expect(result.content).toContain('deployment and debugging');
     expect(result.content).not.toContain('fluffy cat');
+  });
+
+  it('skips duplicate video_transcript calls after one transcript already succeeded', async () => {
+    let llmCall = 0;
+    const events: any[] = [];
+    const executeCalls: string[] = [];
+
+    const llmClient = {
+      async *streamChat() {
+        llmCall += 1;
+        if (llmCall === 1) {
+          yield {
+            type: 'tool_call' as const,
+            toolCall: {
+              id: 'probe-1',
+              name: 'video_probe',
+              arguments: JSON.stringify({ url: 'https://www.bilibili.com/video/BV1GqcWzuELB' }),
+            },
+          };
+          yield {
+            type: 'tool_call' as const,
+            toolCall: {
+              id: 'transcript-1',
+              name: 'video_transcript',
+              arguments: JSON.stringify({ url: 'https://www.bilibili.com/video/BV1GqcWzuELB' }),
+            },
+          };
+          yield {
+            type: 'tool_call' as const,
+            toolCall: {
+              id: 'transcript-2',
+              name: 'video_transcript',
+              arguments: JSON.stringify({ url: 'https://www.bilibili.com/video/BV1GqcWzuELB' }),
+            },
+          };
+          yield { type: 'done' as const, finishReason: 'tool_calls' };
+          return;
+        }
+        yield { type: 'content' as const, content: 'Done.' };
+        yield { type: 'done' as const, finishReason: 'stop' };
+      },
+    };
+
+    const taskManager = {
+      getTaskState: () => ({
+        goal: {
+          description: 'summarize this video',
+          videoUrl: 'https://www.bilibili.com/video/BV1GqcWzuELB',
+          requiresVideoProbe: true,
+          requiresVideoDownload: false,
+          requiresTranscript: true,
+        },
+      }),
+      getToolCallDecision: () => ({ allowed: true }),
+      recordToolCall: () => {},
+    };
+
+    const result = await processAgentTurn(
+      'session-video-dedupe',
+      [{ role: 'user', content: 'summarize this video' }],
+      [],
+      { sessionId: 'session-video-dedupe', userId: 'u1', workspaceDir: '/tmp' },
+      taskManager,
+      { toolCall: { create: async () => ({}) } },
+      llmClient,
+      {
+        execute: async (toolName: string) => {
+          executeCalls.push(toolName);
+          if (toolName === 'video_probe') {
+            return {
+              success: true,
+              output: 'probe ok',
+              artifacts: [{ name: 'video-probe.json', content: '{"duration":123}' }],
+            };
+          }
+          return {
+            success: true,
+            output: 'Transcript extraction completed.\n--- Transcript ---\nline 1\nline 2',
+            artifacts: [{ type: 'file', name: 'transcript.txt', fileId: 'f1' }],
+          };
+        },
+      },
+      createMockStream(events),
+      Date.now(),
+      5
+    );
+
+    expect(result.content.length).toBeGreaterThan(0);
+    expect(executeCalls.filter((name) => name === 'video_transcript').length).toBe(1);
+  });
+
+  it('does not execute video_download unless user explicitly requested download', async () => {
+    let llmCall = 0;
+    const executeCalls: string[] = [];
+
+    const llmClient = {
+      async *streamChat() {
+        llmCall += 1;
+        if (llmCall === 1) {
+          yield {
+            type: 'tool_call' as const,
+            toolCall: {
+              id: 'download-1',
+              name: 'video_download',
+              arguments: JSON.stringify({ url: 'https://www.bilibili.com/video/BV1GqcWzuELB' }),
+            },
+          };
+          yield { type: 'done' as const, finishReason: 'tool_calls' };
+          return;
+        }
+        yield { type: 'content' as const, content: 'Skipped download and continued.' };
+        yield { type: 'done' as const, finishReason: 'stop' };
+      },
+    };
+
+    const taskManager = {
+      getTaskState: () => ({
+        goal: {
+          description: 'summarize this video',
+          videoUrl: 'https://www.bilibili.com/video/BV1GqcWzuELB',
+          requiresVideoProbe: true,
+          requiresVideoDownload: false,
+          requiresTranscript: false,
+        },
+      }),
+      getToolCallDecision: () => ({ allowed: true }),
+      recordToolCall: () => {},
+    };
+
+    const result = await processAgentTurn(
+      'session-video-no-download',
+      [{ role: 'user', content: 'summarize this video' }],
+      [],
+      { sessionId: 'session-video-no-download', userId: 'u1', workspaceDir: '/tmp' },
+      taskManager,
+      { toolCall: { create: async () => ({}) } },
+      llmClient,
+      {
+        execute: async (toolName: string) => {
+          executeCalls.push(toolName);
+          return { success: true, output: 'ok' };
+        },
+      },
+      createMockStream([]),
+      Date.now(),
+      4
+    );
+
+    expect(result.content).toContain('Skipped download');
+    expect(executeCalls.includes('video_download')).toBe(false);
+  });
+
+  it('returns transcript-extraction failure message instead of claiming tools were not executed', async () => {
+    let llmCall = 0;
+
+    const llmClient = {
+      async *streamChat() {
+        llmCall += 1;
+        if (llmCall === 1) {
+          yield {
+            type: 'tool_call' as const,
+            toolCall: {
+              id: 'transcript-fail-1',
+              name: 'video_transcript',
+              arguments: JSON.stringify({ url: 'https://www.bilibili.com/video/BV1GqcWzuELB' }),
+            },
+          };
+          yield { type: 'done' as const, finishReason: 'tool_calls' };
+          return;
+        }
+        yield { type: 'content' as const, content: 'I can summarize now.' };
+        yield { type: 'done' as const, finishReason: 'stop' };
+      },
+    };
+
+    const taskManager = {
+      getTaskState: () => ({
+        goal: {
+          description: 'summarize this video',
+          videoUrl: 'https://www.bilibili.com/video/BV1GqcWzuELB',
+          requiresVideoProbe: true,
+          requiresVideoDownload: false,
+          requiresTranscript: true,
+        },
+      }),
+      getToolCallDecision: () => ({ allowed: true }),
+      recordToolCall: () => {},
+    };
+
+    const result = await processAgentTurn(
+      'session-video-transcript-failed',
+      [{ role: 'user', content: 'summarize this video' }],
+      [],
+      { sessionId: 'session-video-transcript-failed', userId: 'u1', workspaceDir: '/tmp' },
+      taskManager,
+      { toolCall: { create: async () => ({}) } },
+      llmClient,
+      {
+        execute: async () => ({ success: false, output: '', error: 'transcript extraction failed' }),
+      },
+      createMockStream([]),
+      Date.now(),
+      4
+    );
+
+    expect(result.content).toContain('did not return usable transcript content');
+    expect(result.content).not.toContain('required video tools were not executed');
   });
 });

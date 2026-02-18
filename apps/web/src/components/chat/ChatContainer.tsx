@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { DocumentCanvas } from '../canvas/DocumentCanvas';
 import { ChatInput } from './ChatInput';
 import { apiClient, type SSEEvent, ApiError } from '../../lib/api';
+import { createSSEConnection } from '../../lib/sse';
 import { useChatStore } from '../../stores/chatStore';
 import { useSession } from '../../hooks/useSessions';
 import { useChatLayout } from '../../hooks/useChatLayout';
@@ -67,6 +68,8 @@ export function ChatContainer({ sessionId, onOpenSkills }: ChatContainerProps) {
   // Ensure chat layout width is applied so ChatInput and DocumentRenderer share the same max-width
   useChatLayout();
   const abortControllerRef = useRef<AbortController | null>(null);
+  const activePostStreamRef = useRef(false);
+  const streamReconnectCleanupRef = useRef<(() => void) | null>(null);
   const initialMessageHandledRef = useRef(false);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -126,6 +129,7 @@ export function ChatContainer({ sessionId, onOpenSkills }: ChatContainerProps) {
   const associateAgentStepsWithMessage = useChatStore((state) => state.associateAgentStepsWithMessage);
   const clearFiles = useChatStore((state) => state.clearFiles);
   const loadComputerStateFromStorage = useChatStore((state) => state.loadComputerStateFromStorage);
+  const loadRuntimeStateFromStorage = useChatStore((state) => state.loadRuntimeStateFromStorage);
   const resetForSession = useChatStore((state) => state.resetForSession);
 
   // Comprehensive session-switch cleanup: abort stale streams, reset all session-scoped state,
@@ -143,6 +147,7 @@ export function ChatContainer({ sessionId, onOpenSkills }: ChatContainerProps) {
 
     // Rehydrate Computer tab from localStorage for the NEW session
     loadComputerStateFromStorage(sessionId);
+    loadRuntimeStateFromStorage(sessionId);
 
     // Force refetch messages for the session we're switching TO.
     // Without this, stale cached data (staleTime: 30s) may be missing messages
@@ -157,6 +162,8 @@ export function ChatContainer({ sessionId, onOpenSkills }: ChatContainerProps) {
 
   useEffect(() => {
     return () => {
+      streamReconnectCleanupRef.current?.();
+      streamReconnectCleanupRef.current = null;
       abortControllerRef.current?.abort();
     };
   }, [sessionId]);
@@ -259,9 +266,9 @@ export function ChatContainer({ sessionId, onOpenSkills }: ChatContainerProps) {
           if (!isAlreadyStreamingCurrentSession) {
             startStreaming(sessionId);
           }
-          if (!state.agentRunStartIndex.has(sessionId)) {
-            setAgentRunStartIndex(sessionId);
-          }
+          // Always reset live run boundary on every new turn so Computer timeline
+          // and message-scoped associations start from this turn only.
+          setAgentRunStartIndex(sessionId);
           // Always clear reasoning steps on a new agent turn so the UI starts
           // fresh with "Step 1" rather than showing stale steps from the prior turn.
           clearReasoningSteps(sessionId);
@@ -276,11 +283,30 @@ export function ChatContainer({ sessionId, onOpenSkills }: ChatContainerProps) {
         break;
 
       case 'message.complete':
+        if (event.data?.assistantMessageId && typeof event.data?.content === 'string') {
+          const content = event.data.content.trim();
+          if (content) {
+            const currentMessages = useChatStore.getState().messages.get(sessionId) || [];
+            const alreadyPresent = currentMessages.some(
+              (message) => message.id === event.data.assistantMessageId
+            );
+            if (!alreadyPresent) {
+              addMessage(sessionId, {
+                id: event.data.assistantMessageId,
+                sessionId,
+                role: 'assistant',
+                content,
+                createdAt: new Date(),
+              } as any);
+            }
+          }
+        }
         if (event.data?.assistantMessageId) {
           associateToolCallsWithMessage(sessionId, event.data.assistantMessageId);
           associateAgentStepsWithMessage(sessionId, event.data.assistantMessageId);
         }
         finalizeReasoningTrace(sessionId, typeof event.timestamp === 'number' ? event.timestamp : Date.now());
+        setThinking(false);
         stopStreaming();
         // Refetch messages to ensure we have the latest
         queryClient.invalidateQueries({ queryKey: ['sessions', sessionId, 'messages'] });
@@ -834,6 +860,7 @@ export function ChatContainer({ sessionId, onOpenSkills }: ChatContainerProps) {
         console.error('Stream error:', event.data);
         clearPptPipeline(sessionId);
         clearBrowserSession(sessionId);
+        setThinking(false);
         stopStreaming();
         toast({
           title: 'Stream error',
@@ -847,11 +874,49 @@ export function ChatContainer({ sessionId, onOpenSkills }: ChatContainerProps) {
           sessionId,
           typeof event.timestamp === 'number' ? event.timestamp : Date.now()
         );
+        setThinking(false);
         stopStreaming();
         queryClient.invalidateQueries({ queryKey: ['sessions', sessionId, 'messages'] });
         break;
     }
   };
+
+  useEffect(() => {
+    const shouldReconnectViaSse =
+      isStreaming &&
+      streamingSessionId === sessionId &&
+      !activePostStreamRef.current;
+
+    if (!shouldReconnectViaSse) {
+      streamReconnectCleanupRef.current?.();
+      streamReconnectCleanupRef.current = null;
+      return;
+    }
+
+    const cleanup = createSSEConnection(apiClient.chat.getStreamUrl(sessionId), {
+      reconnect: true,
+      maxReconnectAttempts: 8,
+      onEvent: (event) => {
+        const sseEvent = event as unknown as SSEEvent;
+        handleSSEEvent(sseEvent);
+        if (TERMINAL_STREAM_EVENT_TYPES.has(sseEvent.type)) {
+          streamReconnectCleanupRef.current?.();
+          streamReconnectCleanupRef.current = null;
+        }
+      },
+      onError: (error) => {
+        console.error('Reconnect SSE error:', error);
+      },
+    });
+
+    streamReconnectCleanupRef.current = cleanup;
+    return () => {
+      cleanup();
+      if (streamReconnectCleanupRef.current === cleanup) {
+        streamReconnectCleanupRef.current = null;
+      }
+    };
+  }, [isStreaming, streamingSessionId, sessionId]);
 
   const handleSendMessage = async (
     content: string,
@@ -950,6 +1015,7 @@ export function ChatContainer({ sessionId, onOpenSkills }: ChatContainerProps) {
 
       // PPT pipeline is started by the server via ppt.pipeline.start event, not speculatively.
       // Single request SSE flow: backend persists user message and streams assistant events.
+      activePostStreamRef.current = true;
       for await (const event of apiClient.chat.sendAndStream(
         sessionId,
         content,
@@ -985,6 +1051,8 @@ export function ChatContainer({ sessionId, onOpenSkills }: ChatContainerProps) {
         description: error.message || 'Could not send message',
         variant: 'destructive',
       });
+    } finally {
+      activePostStreamRef.current = false;
     }
   };
 

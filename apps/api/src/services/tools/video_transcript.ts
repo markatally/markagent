@@ -353,7 +353,7 @@ export class VideoTranscriptTool implements Tool {
   description =
     'Extract full transcript text from a video URL. Tries subtitle tracks first; if none exist, falls back to Whisper speech-to-text transcription.';
   requiresConfirmation = false;
-  timeout = 300000;
+  timeout = 900000;
 
   inputSchema = {
     type: 'object' as const,

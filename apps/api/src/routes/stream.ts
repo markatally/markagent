@@ -568,6 +568,18 @@ function findLastVideoDurationSeconds(messages: ExtendedLLMMessage[]): number | 
   return null;
 }
 
+function normalizeVideoUrl(value: string | null | undefined): string {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw);
+    parsed.hash = '';
+    return parsed.toString();
+  } catch {
+    return raw;
+  }
+}
+
 function computeDynamicTurnTimeoutMs(
   isVideoHeavyTurn: boolean,
   durationSeconds: number | null
@@ -635,6 +647,10 @@ export async function processAgentTurn(
   let finalContent = '';
   let toolResultsThisTurn = 0;
   let videoTranscriptSucceeded = findLastTranscriptToolResult(currentMessages) != null;
+  let videoTranscriptAttempted = videoTranscriptSucceeded;
+  let videoProbeSucceeded = findLastVideoDurationSeconds(currentMessages) != null;
+  let videoProbeAttempted = videoProbeSucceeded;
+  const queryFromTask = String(taskManager.getTaskState?.(sessionId)?.goal?.description || '');
 
   const reasoningTimers = new Map<string, number>();
   const reasoningEventSeq = new Map<string, number>();
@@ -664,6 +680,40 @@ export async function processAgentTurn(
   let generatingStepId: string | null = null;
   let planningStepId: string | null = null;
   let videoToolReminderAttempts = 0;
+
+  const maybeAnswerFromTranscriptContext = async (): Promise<boolean> => {
+    const transcriptText = findLastTranscriptToolResult(currentMessages);
+    if (!transcriptText) return false;
+
+    const shouldUseTranscriptQa =
+      isVideoContentIntentText(queryFromTask) ||
+      isTranscriptSegmentFollowupText(queryFromTask) ||
+      Boolean(taskManager.getTaskState?.(sessionId)?.goal?.requiresTranscript) ||
+      Boolean(taskManager.getTaskState?.(sessionId)?.goal?.videoUrl);
+    if (!shouldUseTranscriptQa) return false;
+
+    try {
+      const transcriptQa = await answerVideoQueryFromTranscript({
+        llm: llmClient,
+        userQuery: queryFromTask,
+        transcriptText,
+      });
+      const content = sanitizeModelFacingContent(String(transcriptQa.content || ''));
+      if (!content) return false;
+      finalContent = content;
+      await sseStream.writeSSE({
+        data: JSON.stringify({
+          type: 'message.delta',
+          sessionId,
+          timestamp: Date.now(),
+          data: { content: finalContent, step: steps + 1 },
+        }),
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  };
 
   // Collector array for completed reasoning steps to persist in message metadata
   const completedReasoningSteps: Array<{
@@ -804,6 +854,24 @@ export async function processAgentTurn(
   );
   // === CONTINUATION LOOP ===
   while (steps < maxSteps) {
+    if (await maybeAnswerFromTranscriptContext()) {
+      if (generatingStepId) {
+        await emitReasoningStep({
+          stepId: generatingStepId,
+          label: 'Generating response',
+          status: 'completed',
+          message: 'Response ready.',
+        });
+        generatingStepId = null;
+      }
+      return {
+        content: finalContent,
+        finishReason: 'stop',
+        stepsTaken: steps,
+        reasoningSteps: completedReasoningSteps,
+      };
+    }
+
     const observedVideoDurationSeconds = findLastVideoDurationSeconds(currentMessages);
     const turnTimeoutMs = computeDynamicTurnTimeoutMs(isVideoHeavyTurn, observedVideoDurationSeconds);
     // Check execution timeout
@@ -823,19 +891,6 @@ export async function processAgentTurn(
         });
         generatingStepId = null;
       }
-
-      await sseStream.writeSSE({
-        data: JSON.stringify({
-          type: 'message.complete',
-          sessionId,
-          timestamp: Date.now(),
-          data: {
-            content: timeoutMessage,
-            finishReason: 'timeout',
-            stepsTaken: steps,
-          },
-        }),
-      });
 
       return {
         content: timeoutMessage,
@@ -954,6 +1009,7 @@ export async function processAgentTurn(
         requiresVideoProcessing &&
         requiresTranscriptForTask &&
         !videoTranscriptSucceeded &&
+        !videoTranscriptAttempted &&
         videoToolReminderAttempts < 2
       ) {
         videoToolReminderAttempts += 1;
@@ -987,9 +1043,9 @@ export async function processAgentTurn(
         requiresTranscriptForTask &&
         !videoTranscriptSucceeded
       ) {
-        finalContent =
-          'I could not complete the video summary because required video tools were not executed. ' +
-          'Please retry; I will run video_probe and video_transcript for the provided video URL before summarizing.';
+        finalContent = videoTranscriptAttempted
+          ? 'I could not complete the video summary because transcript extraction did not return usable transcript content. Please retry and I will re-run transcript extraction before summarizing.'
+          : 'I could not complete the video summary because required video tools were not executed. Please retry; I will run video_probe and video_transcript for the provided video URL before summarizing.';
 
         if (generatingStepId) {
           await emitReasoningStep({
@@ -1001,19 +1057,6 @@ export async function processAgentTurn(
           });
           generatingStepId = null;
         }
-
-        await sseStream.writeSSE({
-          data: JSON.stringify({
-            type: 'message.complete',
-            sessionId,
-            timestamp: Date.now(),
-            data: {
-              content: finalContent,
-              finishReason: 'stop',
-              stepsTaken: steps + 1,
-            },
-          }),
-        });
 
         return {
           content: finalContent,
@@ -1099,19 +1142,6 @@ export async function processAgentTurn(
         generatingStepId = null;
       }
 
-      await sseStream.writeSSE({
-        data: JSON.stringify({
-          type: 'message.complete',
-          sessionId,
-          timestamp: Date.now(),
-          data: {
-            content: finalContent,
-            finishReason: 'stop',
-            stepsTaken: steps + 1,
-          },
-        }),
-      });
-
       return {
         content: finalContent,
         finishReason: 'stop',
@@ -1141,6 +1171,98 @@ export async function processAgentTurn(
         // Keep empty params if JSON parsing fails
       }
       const taskStateForTool = taskManager.getTaskState?.(sessionId);
+      const taskGoalForTool = taskStateForTool?.goal;
+      const targetVideoUrl = normalizeVideoUrl(
+        typeof taskGoalForTool?.videoUrl === 'string' ? taskGoalForTool.videoUrl : ''
+      );
+      const toolVideoUrl = normalizeVideoUrl(typeof params.url === 'string' ? params.url : '');
+      const sameVideoScope = !targetVideoUrl || !toolVideoUrl || targetVideoUrl === toolVideoUrl;
+
+      if (toolCall.name === 'video_probe') {
+        videoProbeAttempted = true;
+      }
+      if (toolCall.name === 'video_transcript') {
+        videoTranscriptAttempted = true;
+      }
+
+      // Video download should only run when explicitly requested by the user intent.
+      if (toolCall.name === 'video_download' && !taskGoalForTool?.requiresVideoDownload) {
+        await emitReasoningStep({
+          stepId: `tool-${toolCall.id}`,
+          label: videoToolLabels[toolCall.name] || 'Executing tool',
+          status: 'running',
+          message: `Running ${toolCall.name}...`,
+          details: {
+            toolName: toolCall.name,
+          },
+        });
+        await emitReasoningStep({
+          stepId: `tool-${toolCall.id}`,
+          label: videoToolLabels[toolCall.name] || 'Executing tool',
+          status: 'completed',
+          message: 'Skipped unnecessary video download.',
+          finalStatus: 'CANCELED',
+          details: {
+            toolName: toolCall.name,
+          },
+        });
+        currentMessages.push({
+          role: 'tool',
+          content: JSON.stringify({
+            success: false,
+            error:
+              'video_download skipped because user did not request downloading. Use video_probe/video_transcript instead.',
+          }),
+          tool_call_id: toolCall.id,
+        });
+        continue;
+      }
+
+      if (toolCall.name === 'video_probe' && sameVideoScope && videoProbeSucceeded) {
+        await emitReasoningStep({
+          stepId: `tool-${toolCall.id}`,
+          label: videoToolLabels[toolCall.name] || 'Executing tool',
+          status: 'running',
+          message: `Running ${toolCall.name}...`,
+          details: {
+            toolName: toolCall.name,
+          },
+        });
+        await emitReasoningStep({
+          stepId: `tool-${toolCall.id}`,
+          label: videoToolLabels[toolCall.name] || 'Executing tool',
+          status: 'completed',
+          message: 'Skipped duplicate video probe for the same URL.',
+          finalStatus: 'CANCELED',
+          details: {
+            toolName: toolCall.name,
+          },
+        });
+        continue;
+      }
+
+      if (toolCall.name === 'video_transcript' && sameVideoScope && videoTranscriptSucceeded) {
+        await emitReasoningStep({
+          stepId: `tool-${toolCall.id}`,
+          label: videoToolLabels[toolCall.name] || 'Executing tool',
+          status: 'running',
+          message: `Running ${toolCall.name}...`,
+          details: {
+            toolName: toolCall.name,
+          },
+        });
+        await emitReasoningStep({
+          stepId: `tool-${toolCall.id}`,
+          label: videoToolLabels[toolCall.name] || 'Executing tool',
+          status: 'completed',
+          message: 'Skipped duplicate transcript extraction for the same URL.',
+          finalStatus: 'CANCELED',
+          details: {
+            toolName: toolCall.name,
+          },
+        });
+        continue;
+      }
       if (
         toolCall.name === 'video_transcript' &&
         taskStateForTool?.goal?.requiresTranscript &&
@@ -1392,6 +1514,9 @@ export async function processAgentTurn(
         if (toolCall.name === 'video_transcript' && result.success) {
           videoTranscriptSucceeded = true;
         }
+        if (toolCall.name === 'video_probe' && result.success) {
+          videoProbeSucceeded = true;
+        }
 
         await sseStream.writeSSE({
           data: JSON.stringify({
@@ -1632,6 +1757,7 @@ stream.get('/sessions/:sessionId/stream', async (c) => {
           data: {
             userMessageId: latestUserMessage.id,
             assistantMessageId: existingResponse.id,
+            content: existingResponse.content,
             finishReason:
               typeof (existingResponse.metadata as any)?.finishReason === 'string'
                 ? (existingResponse.metadata as any).finishReason
@@ -1963,6 +2089,7 @@ DEPENDENCY RECOVERY RULES:
           data: {
             userMessageId: latestUserMessage.id,
             assistantMessageId: assistantMessage?.id ?? null,
+            content: result.content,
             finishReason: result.finishReason,
           },
         }),
@@ -2399,6 +2526,7 @@ DEPENDENCY RECOVERY RULES:
           data: {
             userMessageId: userMessage.id,
             assistantMessageId: assistantMessage?.id ?? null,
+            content: result.content,
             finishReason: result.finishReason,
           },
         }),
@@ -2637,6 +2765,7 @@ stream.post('/sessions/:sessionId/agent', async (c) => {
             data: {
               userMessageId: userMessage.id,
               assistantMessageId: assistantMessage?.id ?? null,
+              content: finalContent,
               scenario: finalState.parsedIntent?.scenario,
               finishReason: 'stop',
             },

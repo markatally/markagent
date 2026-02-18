@@ -127,4 +127,57 @@ describe('ChatContainer stream fallback cleanup', () => {
       expect(state.streamingSessionId).toBe(null);
     });
   });
+
+  it('resets run start index on every new message.start event', async () => {
+    const now = Date.now();
+    useChatStore.setState({
+      agentRunStartIndex: new Map([['session-1', 0]]),
+      agentSteps: new Map([
+        [
+          'session-1',
+          {
+            currentStepIndex: 2,
+            steps: [
+              { stepIndex: 0, type: 'browse', output: 'old-1' },
+              { stepIndex: 1, type: 'browse', output: 'old-2' },
+              { stepIndex: 2, type: 'browse', output: 'old-3' },
+            ],
+          },
+        ],
+      ]),
+    });
+
+    vi.spyOn(apiClient.chat, 'sendAndStream').mockImplementation(
+      async function* () {
+        yield {
+          type: 'message.start',
+          sessionId: 'session-1',
+          timestamp: now,
+          data: {},
+        } as any;
+        yield {
+          type: 'message.complete',
+          sessionId: 'session-1',
+          timestamp: now + 1,
+          data: { assistantMessageId: null },
+        } as any;
+      }
+    );
+
+    const queryClient = new QueryClient();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <ChatContainer sessionId="session-1" />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    fireEvent.click(screen.getByText('send'));
+
+    await waitFor(() => {
+      const runStart = useChatStore.getState().agentRunStartIndex.get('session-1');
+      expect(runStart).toBe(3);
+    });
+  });
 });

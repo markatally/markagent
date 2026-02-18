@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'bun:test';
-import { getConfig, loadConfig } from '../../apps/api/src/services/config';
+import { clearConfigCache, getConfig, loadConfig } from '../../apps/api/src/services/config';
 import type { AppConfig } from '../../apps/api/src/services/config';
 import path from 'path';
 
@@ -22,6 +22,24 @@ describe('Phase 1: Config Service', () => {
       expect(config.session).toBeDefined();
       expect(config.tools).toBeDefined();
       expect(config.security).toBeDefined();
+    });
+
+    it('should resolve relative CONFIG_PATH from repo root even when cwd is apps/api', () => {
+      const originalCwd = process.cwd();
+      const originalConfigPath = process.env.CONFIG_PATH;
+      try {
+        process.chdir(path.join(originalCwd, 'apps/api'));
+        process.env.CONFIG_PATH = 'config/default.json';
+        clearConfigCache();
+        const resolved = loadConfig();
+        expect(resolved.session).toBeDefined();
+        expect(resolved.tools.enabled.length).toBeGreaterThan(0);
+      } finally {
+        process.chdir(originalCwd);
+        process.env.CONFIG_PATH = originalConfigPath;
+        clearConfigCache();
+        config = getConfig();
+      }
     });
 
     it('should have valid LLM config', () => {
